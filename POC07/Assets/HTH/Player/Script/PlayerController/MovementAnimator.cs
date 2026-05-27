@@ -1,31 +1,35 @@
 ﻿// ============================================================
-// MovementAnimator.cs  v1.1
-// 플레이어 이동 패키지 — Animator 파라미터 동기화 컴포넌트
+// MovementAnimator.cs  v2.0
+// 플레이어 이동 + 무기 콤보 Animator 파라미터 통합 동기화
 //
-// [독립 패키지]
-//   namespace : PlayerMovement (HOSE 종속 없음)
-//   의존 대상 : PlayerMover (같은 오브젝트)
+// [v2.0 변경 — Animator 파라미터 전면 개편]
+//   추가 파라미터:
+//     VelocityY     (Float)   : 수직 속도 → Fall 전환 조건
+//     Jump          (Trigger) : 1단 점프 진입
+//     AttackCombo1  (Trigger) : 지상 1단 콤보 진입
+//     AttackCombo2  (Trigger) : 지상 2단 콤보 진입 (윈도우 내)
+//     AttackCombo3  (Trigger) : 지상 3단 콤보 진입 (윈도우 내)
+//     AirAttack     (Trigger) : 공중 공격 진입
 //
-// [v1.1 변경 — Animator 책임 완전 통합]
-//   PlayerMover 에서 분리된 Trigger 처리를 이 파일로 이전.
-//   모든 Animator.StringToHash 는 이 파일 하나에서만 관리.
+//   추가 이벤트 구독:
+//     PlayerMover.OnJumped          → Jump Trigger
+//     RustyKeyWeapon.OnCombo1Started → AttackCombo1 Trigger
+//     RustyKeyWeapon.OnCombo2Started → AttackCombo2 Trigger
+//     RustyKeyWeapon.OnCombo3Started → AttackCombo3 Trigger
+//     RustyKeyWeapon.OnAirAttackStarted → AirAttack Trigger
 //
-//   추가:
-//     _hashDash        — "Dash" Trigger
-//     _hashDoubleJump  — "DoubleJump" Trigger
-//     PlayerMover.OnDashStarted   구독 → SetTrigger("Dash")
-//     PlayerMover.OnDoubleJumped  구독 → SetTrigger("DoubleJump")
+//   기존 유지:
+//     Speed / IsGrounded / IsFiring (매 프레임 Update)
+//     Dash / DoubleJump (이벤트 Trigger)
 //
-//   설계 원칙:
-//     PlayerMover  = 물리 이동만 담당. Animator 를 전혀 알지 못함.
-//     MovementAnimator = 모든 Animator 파라미터를 단독 관리.
+// [파라미터 전체 목록 — 이 파일이 유일한 관리 지점]
+//   Float   : Speed, VelocityY
+//   Bool    : IsGrounded, IsFiring
+//   Trigger : Jump, DoubleJump, Dash,
+//             AttackCombo1, AttackCombo2, AttackCombo3, AirAttack
 //
-// [Animator 파라미터 완전 목록 — 이 파일이 유일한 관리 지점]
-//   Speed       (Float)  : Mathf.Abs(MoveInput) — 매 프레임 Update
-//   IsGrounded  (Bool)   : IsGrounded 값        — 매 프레임 Update
-//   IsFiring    (Bool)   : SetFiring() 외부 호출  — 매 프레임 Update
-//   Dash        (Trigger): PlayerMover.OnDashStarted 이벤트 수신 시 1회
-//   DoubleJump  (Trigger): PlayerMover.OnDoubleJumped 이벤트 수신 시 1회
+// [네임스페이스]
+//   namespace : KEY
 // ============================================================
 
 using UnityEngine;
@@ -33,47 +37,115 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 모든 Animator 파라미터를 관리하는 단독 컴포넌트. (v1.1)
+    /// 플레이어 이동 + 무기 콤보 Animator 파라미터 통합 동기화 컴포넌트. (v2.0)
     ///
     /// ────────────────────────────────────────────────────
     /// [이 파일이 하는 것]
     ///   - 모든 Animator.StringToHash 선언 및 캐싱
-    ///   - Update 매 프레임: Speed / IsGrounded / IsFiring SetFloat/SetBool
-    ///   - OnDashStarted 수신 시 1회: SetTrigger("Dash")
-    ///   - OnDoubleJumped 수신 시 1회: SetTrigger("DoubleJump")
+    ///   - Update 매 프레임: Speed / VelocityY / IsGrounded / IsFiring
+    ///   - PlayerMover 이벤트 구독: Jump / DoubleJump / Dash Trigger
+    ///   - PlayerWeaponBase 이벤트 구독: AttackCombo1/2/3 / AirAttack Trigger
     ///
-    /// [이 파일이 하지 않는 것]
-    ///   - 물리 이동 / 점프 판정 (PlayerMover 담당)
-    ///   - 입력 수신 (MovementInput 담당)
+    /// [Fall 전환 구조]
+    ///   PlayerJump → (VelocityY < -0.1) → PlayerFall
+    ///   코드는 VelocityY 를 매 프레임 SetFloat 만 하고
+    ///   전환 조건 설정은 Animator Controller 에서 수행.
     ///
+    /// [콤보 전환 구조]
+    ///   AnyState → (AttackCombo1) → PlayerAttack01
+    ///   PlayerAttack01 → (AttackCombo2 + ExitTime 0.5) → PlayerAttack02
+    ///   PlayerAttack02 → (AttackCombo3 + ExitTime 0.5) → PlayerAttack03
+    ///   PlayerAttack01/02/03 → ExitTime 1.0 → PlayerIdle
+    ///   PlayerFall → (AirAttack) → PlayerAirAttack → ExitTime → PlayerFall
     /// ────────────────────────────────────────────────────
-    /// [StringToHash 캐싱 이유]
-    ///   Animator.SetFloat("Speed") 는 매 프레임 문자열 비교 발생.
-    ///   StringToHash 로 int 를 미리 계산해두면 int 비교만 하므로 훨씬 빠름.
-    ///   static readonly 로 클래스당 1회만 계산됨.
-    ///
-    /// ────────────────────────────────────────────────────
-    /// [Trigger vs Bool/Float 발행 방식이 다른 이유]
-    ///   Float/Bool  : 매 프레임 최신 상태를 덮어쓰는 방식 (Update).
-    ///   Trigger     : 이벤트 발생 순간 1회만 호출해야 함.
-    ///                 Update 에서 매 프레임 SetTrigger 하면
-    ///                 클립이 매 프레임 재시작되는 버그 발생.
-    ///                 → 이벤트 구독으로 정확히 1회만 발행.
-    ///
-    /// ────────────────────────────────────────────────────
-    /// [IsFiring 연동 — 선택]
-    ///   분사 등 전투 상태를 Attack Layer 에 전달할 때
-    ///   외부(PlayerCombat 등)에서 SetFiring(bool) 호출.
-    ///   전투 시스템이 없는 프로젝트는 호출하지 않으면 됨 (false 고정).
-    ///
-    /// ────────────────────────────────────────────────────
-    /// [Animator 없는 경우]
-    ///   Awake() 에서 Animator = null 이면 컴포넌트 자체를 비활성.
-    ///   이동/점프/대쉬 동작에는 영향 없음.
     /// </summary>
     [RequireComponent(typeof(PlayerMover))]
     public class MovementAnimator : MonoBehaviour
     {
+        // ──────────────────────────────────────────
+        // Animator 해시 캐싱 — 이동
+        // ──────────────────────────────────────────
+
+        /// <summary> "Speed" Float — Mathf.Abs(MoveInput). 매 프레임 갱신. </summary>
+        private static readonly int _hashSpeed = Animator.StringToHash("Speed");
+
+        /// <summary>
+        /// "VelocityY" Float — Rigidbody2D.velocity.y.
+        /// Fall 전환 조건: VelocityY &lt; -0.1
+        /// Animator Controller 에서 PlayerJump → PlayerFall 전환에 사용.
+        /// </summary>
+        private static readonly int _hashVelocityY = Animator.StringToHash("VelocityY");
+
+        /// <summary> "IsGrounded" Bool — 지상/공중 판별. 매 프레임 갱신. </summary>
+        private static readonly int _hashIsGrounded = Animator.StringToHash("IsGrounded");
+
+        /// <summary> "IsFiring" Bool — 공격 상태. SetFiring() 외부 호출. </summary>
+        private static readonly int _hashIsFiring = Animator.StringToHash("IsFiring");
+
+        /// <summary>
+        /// "Jump" Trigger — 1단 점프 진입.
+        /// PlayerMover.OnJumped 수신 시 1회 SetTrigger.
+        ///
+        /// [1단 점프에 Trigger 가 필요한 이유]
+        ///   기존 IsGrounded=false 만으로는 점프 버튼을 눌렀는지
+        ///   낙하로 공중이 된 건지 구별 불가.
+        ///   Jump Trigger 로 점프 의도를 명시적으로 전달.
+        /// </summary>
+        private static readonly int _hashJump = Animator.StringToHash("Jump");
+
+        /// <summary>
+        /// "DoubleJump" Trigger — 2단 점프 진입.
+        /// PlayerMover.OnDoubleJumped 수신 시 1회 SetTrigger.
+        /// </summary>
+        private static readonly int _hashDoubleJump = Animator.StringToHash("DoubleJump");
+
+        /// <summary>
+        /// "Dash" Trigger — 대쉬 진입.
+        /// PlayerMover.OnDashStarted 수신 시 1회 SetTrigger.
+        /// </summary>
+        private static readonly int _hashDash = Animator.StringToHash("Dash");
+
+        // ──────────────────────────────────────────
+        // Animator 해시 캐싱 — 콤보 공격
+        // ──────────────────────────────────────────
+
+        /// <summary>
+        /// "AttackCombo1" Trigger — 1단 콤보 진입.
+        /// PlayerWeaponAnimator 가 RustyKeyWeapon.OnCombo1Started 를 받아 여기로 전달.
+        ///
+        /// [Animator Controller 전환 설정]
+        ///   AnyState → PlayerAttack01 조건: AttackCombo1 (IsGrounded=true 추가 권장)
+        /// </summary>
+        private static readonly int _hashAttackCombo1 = Animator.StringToHash("AttackCombo1");
+
+        /// <summary>
+        /// "AttackCombo2" Trigger — 2단 콤보 진입.
+        ///
+        /// [Animator Controller 전환 설정]
+        ///   PlayerAttack01 → PlayerAttack02
+        ///   조건: AttackCombo2 / HasExitTime=true / ExitTime=0.5
+        ///   (클립 50% 이후 입력 감지 → 콤보 윈도우 구현)
+        /// </summary>
+        private static readonly int _hashAttackCombo2 = Animator.StringToHash("AttackCombo2");
+
+        /// <summary>
+        /// "AttackCombo3" Trigger — 3단 콤보(피니셔) 진입.
+        ///
+        /// [Animator Controller 전환 설정]
+        ///   PlayerAttack02 → PlayerAttack03
+        ///   조건: AttackCombo3 / HasExitTime=true / ExitTime=0.5
+        /// </summary>
+        private static readonly int _hashAttackCombo3 = Animator.StringToHash("AttackCombo3");
+
+        /// <summary>
+        /// "AirAttack" Trigger — 공중 공격 진입.
+        ///
+        /// [Animator Controller 전환 설정]
+        ///   AnyState → PlayerAirAttack
+        ///   조건: AirAttack (IsGrounded=false 추가 권장)
+        /// </summary>
+        private static readonly int _hashAirAttack = Animator.StringToHash("AirAttack");
+
         // ──────────────────────────────────────────
         // 컴포넌트 참조
         // ──────────────────────────────────────────
@@ -81,78 +153,23 @@ namespace KEY
         private PlayerMover _mover;
         private Animator _animator;
 
-        // ──────────────────────────────────────────
-        // Animator 해시 캐싱
-        // ──────────────────────────────────────────
-        // 이 파일이 모든 Animator 파라미터 이름의 유일한 관리 지점.
-        // 파라미터 이름 변경 시 이곳만 수정하면 됨.
-        // ⚠️ Animator Controller 의 파라미터명과 대소문자까지 완전 일치 필수.
-        //    불일치 시 Unity 는 에러 없이 조용히 무시함.
-
         /// <summary>
-        /// "Speed" 파라미터 해시.
-        /// 이동 블렌드 트리용. 0 = 정지 / 1 = 최대 속도.
-        /// Update() 에서 매 프레임 SetFloat.
+        /// 현재 구독 중인 무기 컴포넌트.
+        /// SetWeapon() 으로 교체.
         /// </summary>
-        private static readonly int _hashSpeed = Animator.StringToHash("Speed");
-
-        /// <summary>
-        /// "IsGrounded" 파라미터 해시.
-        /// 지상/공중 State 전환용. true = 지면 접촉 중.
-        /// Update() 에서 매 프레임 SetBool.
-        /// </summary>
-        private static readonly int _hashIsGrounded = Animator.StringToHash("IsGrounded");
-
-        /// <summary>
-        /// "IsFiring" 파라미터 해시.
-        /// Attack Layer 제어용. 외부 SetFiring() 으로 설정.
-        /// Update() 에서 매 프레임 SetBool.
-        /// </summary>
-        private static readonly int _hashIsFiring = Animator.StringToHash("IsFiring");
-
-        /// <summary>
-        /// "Dash" 트리거 해시.
-        ///
-        /// [Trigger 파라미터란?]
-        ///   Float/Bool 과 달리 일회성 신호.
-        ///   SetTrigger() 호출 시 Animator 가 해당 전환을 1회 소비 후 초기화.
-        ///   매 프레임 호출하면 클립이 재시작되므로 반드시 1회만 호출.
-        ///
-        /// PlayerMover.OnDashStarted 이벤트 수신 시 1회 SetTrigger.
-        /// </summary>
-        private static readonly int _hashDash = Animator.StringToHash("Dash");
-
-        /// <summary>
-        /// "DoubleJump" 트리거 해시.
-        ///
-        /// [1단 점프와 구분이 필요한 이유]
-        ///   1단 점프 : IsGrounded = false 전환 → Animator 가 자동 처리.
-        ///   2단 점프 : 이미 공중이라 IsGrounded 가 바뀌지 않음.
-        ///              → 트리거로 명시적으로 알려야 DoubleJump 클립 재생.
-        ///
-        /// PlayerMover.OnDoubleJumped 이벤트 수신 시 1회 SetTrigger.
-        /// </summary>
-        private static readonly int _hashDoubleJump = Animator.StringToHash("DoubleJump");
+        private PlayerWeaponBase _currentWeapon;
 
         // ──────────────────────────────────────────
         // 외부 제어 상태
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// IsFiring Animator Bool 값.
-        /// SetFiring() 으로 외부(전투 시스템)에서 설정.
-        /// 이동 패키지 자체는 이 값을 변경하지 않는다.
-        /// </summary>
+        /// <summary> IsFiring Animator Bool 값. SetFiring() 으로 외부에서 설정. </summary>
         private bool _isFiring;
 
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 컴포넌트 취득 + Animator 확인.
-        /// Animator 미부착 시 이 컴포넌트 비활성 — 이동 동작에 영향 없음.
-        /// </summary>
         private void Awake()
         {
             _mover = GetComponent<PlayerMover>();
@@ -160,91 +177,121 @@ namespace KEY
 
             if (_animator == null)
             {
-                Debug.LogWarning("[MovementAnimator] Animator 가 없습니다. " +
-                                 "Animator 파라미터 동기화가 비활성됩니다.");
+                Debug.LogWarning("[MovementAnimator] Animator 가 없습니다. 비활성화합니다.");
                 enabled = false;
             }
         }
 
-        /// <summary>
-        /// Start 에서 PlayerMover 이벤트 구독.
-        ///
-        /// [왜 Start 인가?]
-        ///   PlayerMover 는 Awake 에서 초기화 완료.
-        ///   Start 는 모든 Awake 완료 후 실행 → null 참조 없이 안전하게 구독.
-        ///
-        /// [구독 이벤트]
-        ///   OnDashStarted  → HandleDashStarted()  → SetTrigger("Dash")
-        ///   OnDoubleJumped → HandleDoubleJumped() → SetTrigger("DoubleJump")
-        /// </summary>
         private void Start()
         {
             if (_mover == null) return;
-            _mover.OnDashStarted += HandleDashStarted;
+
+            // ── 이동 이벤트 구독 ──
+            _mover.OnJumped += HandleJumped;
             _mover.OnDoubleJumped += HandleDoubleJumped;
+            _mover.OnDashStarted += HandleDashStarted;
+        }
+
+        private void OnDestroy()
+        {
+            if (_mover != null)
+            {
+                _mover.OnJumped -= HandleJumped;
+                _mover.OnDoubleJumped -= HandleDoubleJumped;
+                _mover.OnDashStarted -= HandleDashStarted;
+            }
+
+            UnsubscribeWeapon(_currentWeapon);
         }
 
         /// <summary>
         /// 매 프레임 Float / Bool 파라미터 갱신.
-        ///
-        /// [Float / Bool 은 매 프레임 Update 에서 처리하는 이유]
-        ///   상태가 언제 바뀔지 모르므로 항상 최신값을 덮어써야 함.
-        ///   이벤트 방식이면 변경 순간을 놓칠 수 있음.
-        ///
-        /// [Trigger 는 Update 에서 처리하지 않는 이유]
-        ///   매 프레임 SetTrigger 하면 클립이 매 프레임 재시작됨.
-        ///   이벤트 구독으로 발생 순간 1회만 호출 (Start 에서 구독).
+        /// Trigger 는 이벤트 구독으로 1회만 처리.
         /// </summary>
         private void Update()
         {
             _animator.SetFloat(_hashSpeed, Mathf.Abs(_mover.MoveInput));
+            _animator.SetFloat(_hashVelocityY, _mover.VelocityY);
             _animator.SetBool(_hashIsGrounded, _mover.IsGrounded);
             _animator.SetBool(_hashIsFiring, _isFiring);
         }
 
-        /// <summary>
-        /// 구독 해제. 메모리 누수 방지.
-        /// </summary>
-        private void OnDestroy()
-        {
-            if (_mover == null) return;
-            _mover.OnDashStarted -= HandleDashStarted;
-            _mover.OnDoubleJumped -= HandleDoubleJumped;
-        }
-
         // ══════════════════════════════════════════════════════
-        // 이벤트 핸들러 — Trigger 발행
+        // 이벤트 핸들러 — 이동 Trigger
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// PlayerMover.OnDashStarted 수신 → "Dash" Trigger 1회 발행.
-        ///
-        /// [이 구조의 이점]
-        ///   PlayerMover 는 Animator 를 모른다.
-        ///   대쉬 물리가 시작됐다는 이벤트를 보내면
-        ///   MovementAnimator 가 "그렇군, Dash 트리거를 쏴야겠다" 고 결정한다.
-        ///   나중에 Animator 가 없는 프로젝트에서도 PlayerMover 수정 불필요.
+        /// PlayerMover.OnJumped → "Jump" Trigger 1회 발행.
         /// </summary>
-        private void HandleDashStarted()
-        {
-            _animator.SetTrigger(_hashDash);
-        }
+        private void HandleJumped() => _animator.SetTrigger(_hashJump);
 
         /// <summary>
-        /// PlayerMover.OnDoubleJumped 수신 → "DoubleJump" Trigger 1회 발행.
-        ///
-        /// [1단 점프는 왜 여기서 처리 안 하는가?]
-        ///   1단 점프 시 IsGrounded 가 true → false 로 전환된다.
-        ///   Update() 에서 매 프레임 SetBool(_hashIsGrounded, ...) 으로 갱신하므로
-        ///   Animator 가 IsGrounded = false 전환을 감지하여 Jump State 로 자동 전환.
-        ///   별도 이벤트 없이 자동 처리됨.
-        ///
-        ///   2단 점프는 이미 공중이라 IsGrounded 가 바뀌지 않으므로
-        ///   트리거로 명시적으로 알려야 DoubleJump State 로 전환됨.
+        /// PlayerMover.OnDoubleJumped → "DoubleJump" Trigger 1회 발행.
         /// </summary>
-        private void HandleDoubleJumped()
+        private void HandleDoubleJumped() => _animator.SetTrigger(_hashDoubleJump);
+
+        /// <summary>
+        /// PlayerMover.OnDashStarted → "Dash" Trigger 1회 발행.
+        /// </summary>
+        private void HandleDashStarted() => _animator.SetTrigger(_hashDash);
+
+        // ══════════════════════════════════════════════════════
+        // 이벤트 핸들러 — 콤보 Trigger
+        // ══════════════════════════════════════════════════════
+
+        /// <summary> RustyKeyWeapon.OnCombo1Started → "AttackCombo1" Trigger. </summary>
+        private void HandleCombo1() => _animator.SetTrigger(_hashAttackCombo1);
+
+        /// <summary> RustyKeyWeapon.OnCombo2Started → "AttackCombo2" Trigger. </summary>
+        private void HandleCombo2() => _animator.SetTrigger(_hashAttackCombo2);
+
+        /// <summary> RustyKeyWeapon.OnCombo3Started → "AttackCombo3" Trigger. </summary>
+        private void HandleCombo3() => _animator.SetTrigger(_hashAttackCombo3);
+
+        /// <summary> RustyKeyWeapon.OnAirAttackStarted → "AirAttack" Trigger. </summary>
+        private void HandleAirAttack() => _animator.SetTrigger(_hashAirAttack);
+
+        // ══════════════════════════════════════════════════════
+        // 무기 교체 — 이벤트 재구독
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 무기 컴포넌트를 교체하고 이벤트를 재구독한다.
+        /// PlayerWeaponController.ActivateWeapon() 에서 호출.
+        ///
+        /// [PlayerWeaponAnimator 와의 분리]
+        ///   Animator Trigger 발행 → 이 컴포넌트(MovementAnimator)
+        ///   Weapon 오브젝트 스윙 이동 → PlayerWeaponAnimator
+        ///   둘 다 무기 이벤트를 구독하되 역할이 분리됨.
+        /// </summary>
+        public void SetWeapon(PlayerWeaponBase newWeapon)
         {
-            _animator.SetTrigger(_hashDoubleJump);
+            UnsubscribeWeapon(_currentWeapon);
+            _currentWeapon = newWeapon;
+            SubscribeWeapon(_currentWeapon);
+        }
+
+        private void SubscribeWeapon(PlayerWeaponBase weapon)
+        {
+            if (weapon is RustyKeyWeapon rusty)
+            {
+                rusty.OnCombo1Started += HandleCombo1;
+                rusty.OnCombo2Started += HandleCombo2;
+                rusty.OnCombo3Started += HandleCombo3;
+                rusty.OnAirAttackStarted += HandleAirAttack;
+            }
+            // 추후 HookKeyWeapon 등 추가 시 else if 로 확장
+        }
+
+        private void UnsubscribeWeapon(PlayerWeaponBase weapon)
+        {
+            if (weapon is RustyKeyWeapon rusty)
+            {
+                rusty.OnCombo1Started -= HandleCombo1;
+                rusty.OnCombo2Started -= HandleCombo2;
+                rusty.OnCombo3Started -= HandleCombo3;
+                rusty.OnAirAttackStarted -= HandleAirAttack;
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -253,19 +300,7 @@ namespace KEY
 
         /// <summary>
         /// IsFiring 파라미터를 설정한다.
-        ///
-        /// [호출 예시 — 전투 시스템에서]
-        ///   GetComponent&lt;MovementAnimator&gt;().SetFiring(true);  // 발사 시작
-        ///   GetComponent&lt;MovementAnimator&gt;().SetFiring(false); // 발사 중단
-        ///
-        ///   또는 PlayerMovementFacade 경유:
-        ///   PlayerMovementFacade.Instance.SetFiring(true);
-        ///
-        /// [왜 이동 패키지에 IsFiring 이 있는가?]
-        ///   Animator Controller 는 이동 레이어와 Attack 레이어를 함께 관리한다.
-        ///   Animator 접근 창구를 MovementAnimator 하나로 통합하면
-        ///   여러 시스템이 각자 Animator 를 직접 건드리지 않아도 됨.
-        ///   전투 시스템이 없는 프로젝트는 이 메서드를 호출하지 않으면 됨.
+        /// PlayerMovementFacade.SetFiring() 경유로 호출.
         /// </summary>
         public void SetFiring(bool isFiring) => _isFiring = isFiring;
     }

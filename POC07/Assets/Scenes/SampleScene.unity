@@ -9195,6 +9195,8 @@ GameObject:
   - component: {fileID: 1703217640}
   - component: {fileID: 1703217639}
   - component: {fileID: 1703217641}
+  - component: {fileID: 1703217643}
+  - component: {fileID: 1703217642}
   m_Layer: 10
   m_Name: Weapon
   m_TagString: Untagged
@@ -9316,7 +9318,10 @@ MonoBehaviour:
   _weaponEntries:
   - keyType: 0
     weapon: {fileID: 1703217641}
-  _animator: {fileID: 0}
+  _animator: {fileID: 406767541}
+  _movementAnimator: {fileID: 406767537}
+  _weaponAnimator: {fileID: 1703217643}
+  _weaponMover: {fileID: 1703217642}
 --- !u!114 &1703217641
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9331,6 +9336,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KEY.RustyKeyWeapon
   _attackBlocked: 0
   _hitboxManager: {fileID: 1703217639}
+--- !u!114 &1703217642
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1703217636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f716ac1a02ecfb4da072f3de85a8602, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.PlayerWeaponMover
+--- !u!114 &1703217643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1703217636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3663733459db4c0499743c5e26dc36d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.PlayerWeaponAnimator
+  _weaponMover: {fileID: 1703217642}
 --- !u!1 &1756272211
 GameObject:
   m_ObjectHideFlags: 0
