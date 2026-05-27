@@ -10,19 +10,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67a97cd991a96f14fbcfbef72dd7b88d, type: 3}
-  m_Name: KeyData
+  m_Name: WeaponRustyKey
   m_EditorClassIdentifier: Assembly-CSharp::KEY.KeyDataSO
   keyName: "\uC5F4\uC1E0"
   keyType: 0
   description: 
   baseDamage: 10
   comboCount: 3
-  comboWindowTime: 0.8
   hitboxDuration: 0.15
+  attackStateDuration: 1
+  comboWindowStartRatio: 0.5
+  hitboxStartRatio: 0.1
+  hitboxEndRatio: 0.45
   comboMultipliers:
   - 1
   - 1.2
   - 1.5
   airAttackMultiplier: 1.3
+  swingDistance: 0.5
+  swingDuration: 0.08
+  returnDuration: 0.15
+  airSwingDistance: 0.4
   keySprite: {fileID: 0}
   overrideController: {fileID: 0}

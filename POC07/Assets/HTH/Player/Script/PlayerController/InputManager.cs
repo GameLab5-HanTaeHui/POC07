@@ -66,27 +66,27 @@ namespace KEY
 
         /// <summary> 오른쪽 이동 키. 기본 D키. </summary>
         [Tooltip("오른쪽 이동 키. 기본: <Keyboard>/d")]
-        [SerializeField] private string _keyMoveRight = "<Keyboard>/d";
+        protected private string _keyMoveRight = "<Keyboard>/d";
 
         /// <summary> 왼쪽 이동 키. 기본 A키. </summary>
         [Tooltip("왼쪽 이동 키. 기본: <Keyboard>/a")]
-        [SerializeField] private string _keyMoveLeft = "<Keyboard>/a";
+        protected private string _keyMoveLeft = "<Keyboard>/a";
 
         /// <summary> 오른쪽 화살표 보조 이동. </summary>
         [Tooltip("오른쪽 화살표 보조 이동.")]
-        [SerializeField] private string _keyMoveRightAlt = "<Keyboard>/rightArrow";
+        protected private string _keyMoveRightAlt = "<Keyboard>/rightArrow";
 
         /// <summary> 왼쪽 화살표 보조 이동. </summary>
         [Tooltip("왼쪽 화살표 보조 이동.")]
-        [SerializeField] private string _keyMoveLeftAlt = "<Keyboard>/leftArrow";
+        protected private string _keyMoveLeftAlt = "<Keyboard>/leftArrow";
 
         /// <summary> 점프 키. 기본 Space. </summary>
         [Tooltip("점프 키. 기본: <Keyboard>/space")]
-        [SerializeField] private string _keyJump = "<Keyboard>/space";
+        protected private string _keyJump = "<Keyboard>/space";
 
         /// <summary> 대쉬 키. 기본 LShift. </summary>
         [Tooltip("대쉬 키. 기본: <Keyboard>/leftShift")]
-        [SerializeField] private string _keyDash = "<Keyboard>/leftShift";
+        protected private string _keyDash = "<Keyboard>/leftShift";
 
         // ──────────────────────────────────────────
         // Inspector — 무기 키 바인딩
@@ -99,7 +99,7 @@ namespace KEY
         /// 지상/공중 여부는 PlayerMover.IsGrounded 로 판별.
         /// </summary>
         [Tooltip("공격 키. 기본: <Mouse>/leftButton")]
-        [SerializeField] private string _keyAttack = "<Mouse>/leftButton";
+        protected private string _keyAttack = "<Mouse>/leftButton";
 
         // ──────────────────────────────────────────
         // 내부 — InputAction

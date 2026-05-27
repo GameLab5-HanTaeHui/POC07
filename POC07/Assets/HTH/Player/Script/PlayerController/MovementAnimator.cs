@@ -146,6 +146,18 @@ namespace KEY
         /// </summary>
         private static readonly int _hashAirAttack = Animator.StringToHash("AirAttack");
 
+        /// <summary>
+        /// 공격 관련 Trigger 해시 배열.
+        /// ResetAllAttackTriggers() 에서 일괄 ResetTrigger 에 사용.
+        /// </summary>
+        private static readonly int[] _allAttackTriggerHashes = new int[]
+        {
+            Animator.StringToHash("AttackCombo1"),
+            Animator.StringToHash("AttackCombo2"),
+            Animator.StringToHash("AttackCombo3"),
+            Animator.StringToHash("AirAttack"),
+        };
+
         // ──────────────────────────────────────────
         // 컴포넌트 참조
         // ──────────────────────────────────────────
@@ -240,16 +252,73 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary> RustyKeyWeapon.OnCombo1Started → "AttackCombo1" Trigger. </summary>
-        private void HandleCombo1() => _animator.SetTrigger(_hashAttackCombo1);
+        private void HandleCombo1()
+        {
+            //ResetAttackTriggersExcept(_hashAttackCombo1);
+            _animator.SetTrigger(_hashAttackCombo1);
+        }
 
         /// <summary> RustyKeyWeapon.OnCombo2Started → "AttackCombo2" Trigger. </summary>
-        private void HandleCombo2() => _animator.SetTrigger(_hashAttackCombo2);
+        private void HandleCombo2()
+        {
+            _animator.SetTrigger(_hashAttackCombo2);
+        }
 
         /// <summary> RustyKeyWeapon.OnCombo3Started → "AttackCombo3" Trigger. </summary>
         private void HandleCombo3() => _animator.SetTrigger(_hashAttackCombo3);
 
-        /// <summary> RustyKeyWeapon.OnAirAttackStarted → "AirAttack" Trigger. </summary>
-        private void HandleAirAttack() => _animator.SetTrigger(_hashAirAttack);
+        /// <summary>
+        /// 공중 공격 시작.
+        /// 모든 콤보 Trigger 클리어 후 AirAttack Trigger 발행.
+        /// </summary>
+        private void HandleAirAttack()
+        {
+            ResetAttackTriggersExcept(_hashAirAttack);
+            _animator.SetTrigger(_hashAirAttack);
+        }
+
+        /// <summary>
+        /// 콤보 리셋 수신.
+        /// 모든 공격 Trigger 를 일괄 클리어.
+        ///
+        /// [호출 시점]
+        ///   RustyKeyWeapon.ComboReset() → OnComboReset 이벤트
+        ///   → 피니셔 완료, 콤보 윈도우 만료, 무기 교체 등
+        /// </summary>
+        private void HandleComboReset() => ResetAllAttackTriggers();
+
+        // ══════════════════════════════════════════════════════
+        // Trigger 클리어 유틸리티
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 지정된 Trigger 를 제외한 나머지 모든 공격 Trigger 를 ResetTrigger.
+        ///
+        /// [사용 케이스]
+        ///   HandleCombo1() → Combo2/3/AirAttack 클리어
+        ///   HandleCombo2() → Combo1/3/AirAttack 클리어
+        ///   HandleAirAttack() → Combo1/2/3 클리어
+        /// </summary>
+        /// <param name="exceptHash">클리어 제외할 Trigger 해시</param>
+        private void ResetAttackTriggersExcept(int exceptHash)
+        {
+            foreach (int hash in _allAttackTriggerHashes)
+            {
+                if (hash != exceptHash)
+                    _animator.ResetTrigger(hash);
+            }
+        }
+
+        /// <summary>
+        /// 모든 공격 Trigger 를 ResetTrigger 로 강제 클리어.
+        /// 콤보 리셋 시 호출.
+        /// </summary>
+        private void ResetAllAttackTriggers()
+        {
+            foreach (int hash in _allAttackTriggerHashes)
+                _animator.ResetTrigger(hash);
+        }
+
 
         // ══════════════════════════════════════════════════════
         // 무기 교체 — 이벤트 재구독
@@ -279,6 +348,7 @@ namespace KEY
                 rusty.OnCombo2Started += HandleCombo2;
                 rusty.OnCombo3Started += HandleCombo3;
                 rusty.OnAirAttackStarted += HandleAirAttack;
+                rusty.OnComboReset += HandleComboReset;
             }
             // 추후 HookKeyWeapon 등 추가 시 else if 로 확장
         }
@@ -291,6 +361,7 @@ namespace KEY
                 rusty.OnCombo2Started -= HandleCombo2;
                 rusty.OnCombo3Started -= HandleCombo3;
                 rusty.OnAirAttackStarted -= HandleAirAttack;
+                rusty.OnComboReset -= HandleComboReset;
             }
         }
 
