@@ -44,7 +44,7 @@ namespace KEY
     ///         └── ...
     /// ────────────────────────────────────────────────────
     /// </summary>
-    public class WeaponKeyController : MonoBehaviour
+    public class PlayerWeaponController : MonoBehaviour
     {
         // ──────────────────────────────────────────
         // 내부 매핑 데이터 클래스
@@ -111,6 +111,22 @@ namespace KEY
         [Tooltip("Player Animator. 스프라이트 완성 후 연결.")]
         [SerializeField] private Animator _animator;
 
+        /// <summary>
+        /// WeaponAnimator 참조.
+        /// 무기 교체 시 SetWeapon() 호출 — 이벤트 재구독.
+        /// 미연결 시 Awake 에서 자동 탐색.
+        /// </summary>
+        [Tooltip("WeaponAnimator. 미연결 시 자동 탐색.")]
+        [SerializeField] private PlayerWeaponAnimator _weaponAnimator;
+
+        /// <summary>
+        /// WeaponMover 참조.
+        /// 무기 교체 시 SetKeyData() 호출 — 스윙 수치 갱신.
+        /// 미연결 시 Awake 에서 자동 탐색.
+        /// </summary>
+        [Tooltip("WeaponMover. 미연결 시 자동 탐색.")]
+        [SerializeField] private PlayerWeaponMover _weaponMover;
+
         // ──────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────
@@ -153,6 +169,11 @@ namespace KEY
             }
 
             BuildWeaponMap();
+
+            if (_weaponAnimator == null)
+                _weaponAnimator = GetComponent<PlayerWeaponAnimator>();
+            if (_weaponMover == null)
+                _weaponMover = GetComponentInChildren<PlayerWeaponMover>();
         }
 
         /// <summary>
@@ -229,6 +250,12 @@ namespace KEY
             weapon.SetKeyData(keyData);
             weapon.enabled = true;
             _currentWeapon = weapon;
+
+            // WeaponAnimator — 새 무기 이벤트 재구독
+            _weaponAnimator?.SetWeapon(weapon);
+
+            // WeaponMover — 새 열쇠 스윙 수치 갱신
+            _weaponMover?.SetKeyData(keyData);
         }
 
         /// <summary>

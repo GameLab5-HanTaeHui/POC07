@@ -295,9 +295,7 @@ namespace KEY
         /// </summary>
         private void ApplyMovement()
         {
-            _rigid2D.linearVelocity = new Vector2(
-                _moveInput * _settings.MoveSpeed,
-                _rigid2D.linearVelocity.y);
+            _rigid2D.linearVelocity = new Vector2(_moveInput * _settings.MoveSpeed, _rigid2D.linearVelocity.y);
 
             FlipSprite();
         }
@@ -309,8 +307,7 @@ namespace KEY
         /// <summary>
         /// 점프 가능 여부. 접지 / 코요테 타임 / 남은 횟수 중 하나라도 충족 시 true.
         /// </summary>
-        private bool CanJump()
-            => _isGrounded || _coyoteTimer > 0f || _remainingJumps > 0;
+        private bool CanJump() => _isGrounded || _coyoteTimer > 0f || _remainingJumps > 0;
 
         /// <summary>
         /// 점프 실행.

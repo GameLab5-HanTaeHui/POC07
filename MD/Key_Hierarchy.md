@@ -31,16 +31,18 @@ Player
 │     └── Transform 만 존재
 │
 └── Weapon
-      ├── [WeaponKeyController]  * 열쇠 교체 핵심 컨트롤러
+      ├── [PlayerWeaponController]  * 열쇠 교체 핵심 컨트롤러
       │     ├── (SO) KeyInventoryDataSO  * 보유 열쇠 목록
       │     ├── _weaponEntries[0]  keyType=Rusty  / weapon=RustyKeyWeapon
       │     └── _weaponEntries[1]  keyType=Hook   / weapon=HookKeyWeapon (추후)
       │
       ├── [RustyKeyWeapon]         비활성 대기 (KeyType.Rusty)
-      │     └── KeyDataSO 는 WeaponKeyController 가 런타임 주입
+      │     └── KeyDataSO 는 PlayerWeaponController 가 런타임 주입
       ├── [HookKeyWeapon]          비활성 대기 (KeyType.Hook)   ← 추후
       ├── [SpringKeyWeapon]        비활성 대기 (KeyType.Spring) ← 추후
       │
+      ├── [PlayerWeaponAnimator]        무기 이벤트 구독 → Trigger 발행 + PlayerWeaponMover 호출
+      ├── [PlayerWeaponMover]           DOTween 스윙 이동 전담
       └── [PlayerWeaponHitboxManager] * 히트박스 관리
             ├── Hitbox_Combo1    [BoxCollider2D] isTrigger=ON
             ├── Hitbox_Combo2    [BoxCollider2D] isTrigger=ON
@@ -55,10 +57,12 @@ Player
 | PlayerMover | _settings | MovementSettings SO |
 | PlayerMover | _groundCheck | GroundCheck Transform |
 | PlayerMover | _trailRenderer | (선택) TrailRenderer |
-| WeaponKeyController | _inventory | KeyInventoryDataSO |
-| WeaponKeyController | _weaponEntries[0] | keyType=Rusty / weapon=RustyKeyWeapon |
-| WeaponKeyController | _animator | Player Animator (추후) |
+| PlayerWeaponController | _inventory | KeyInventoryDataSO |
+| PlayerWeaponController | _weaponEntries[0] | keyType=Rusty / weapon=RustyKeyWeapon |
+| PlayerWeaponController | _animator | Player Animator (추후) |
 | RustyKeyWeapon | _hitboxManager | PlayerWeaponHitboxManager |
+| PlayerWeaponAnimator | _weaponMover | PlayerWeaponMover (자동 탐색) |
+| PlayerWeaponMover | (자동 초기화) | Awake 에서 localPosition 캐싱 |
 | PlayerWeaponHitboxManager | _hitboxes[0~3] | 각 Hitbox BoxCollider2D |
 | PlayerWeaponHitboxManager | _hitLayer | Enemy 레이어 |
 | Animator | Controller | Player.controller |
@@ -144,7 +148,7 @@ Attack Layer — 스프라이트 완성 후 추가 예정
   파라미터 (예정)
     AttackCombo1 / AttackCombo2 / AttackCombo3 / AirAttack (Trigger)
   AnimatorOverrideController
-    열쇠 교체 시 WeaponKeyController.TrySwapAnimatorOverride() 로 스왑
+    열쇠 교체 시 PlayerWeaponController.TrySwapAnimatorOverride() 로 스왑
 ```
 
 ---
@@ -247,7 +251,7 @@ Enemy_Knight
 | EnemyKnight | _settings | KnightData.asset |
 | EnemyKnight | _backLock | Lock_Back의 LockComponent |
 | EnemyAI | _settings | KnightData.asset |
-| KnightAttack | _hitbox | AttackHitbox의 BoxCollider2D |
+| EnemyKnightAttack | _hitbox | AttackHitbox의 BoxCollider2D |
 
 ### KnightData.asset 기본값
 

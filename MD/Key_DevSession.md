@@ -101,11 +101,11 @@ PlayerIdle / PlayerMove / PlayerJump / PlayerFall / PlayerDash / PlayerDoubleJum
 **작업 내용**
 
 1. 열쇠 타입 enum, 데이터 SO, 인벤토리 SO 설계 및 구현
-2. `WeaponKeyController` — 열쇠 교체 핵심 컨트롤러 구현
+2. `PlayerWeaponController` — 열쇠 교체 핵심 컨트롤러 구현
 3. `PlayerWeaponBase` v1.1 — `SetKeyData()` 추가, KeyDataSO 수치 연동
 4. `RustyKeyWeapon` v1.1 — 하드코딩 수치 제거, KeyDataSO 에서 읽도록 전면 수정
 5. `KeyInventorySO` → `KeyInventoryDataSO` 명칭 변경
-6. `WeaponKeyController` v1.1 — `WeaponEntry.weapon` 타입을 `MonoBehaviour`로 변경, 런타임 캐스팅으로 해결
+6. `PlayerWeaponController` v1.1 — `WeaponEntry.weapon` 타입을 `MonoBehaviour`로 변경, 런타임 캐스팅으로 해결
 
 **완성 파일**
 
@@ -114,7 +114,7 @@ PlayerIdle / PlayerMove / PlayerJump / PlayerFall / PlayerDash / PlayerDoubleJum
 | `KeyType.cs` | 열쇠 타입 enum | v1.0 |
 | `KeyDataSO.cs` | 열쇠 데이터 SO | v1.0 |
 | `KeyInventoryDataSO.cs` | 보유 열쇠 목록 SO | v1.0 |
-| `WeaponKeyController.cs` | 열쇠 교체 컨트롤러 | v1.1 |
+| `PlayerWeaponController.cs` | 열쇠 교체 컨트롤러 | v1.1 |
 | `PlayerWeaponBase.cs` | 무기 베이스 | v1.1 |
 | `RustyKeyWeapon.cs` | 녹슨 열쇠 구현체 | v1.1 |
 
@@ -123,7 +123,7 @@ PlayerIdle / PlayerMove / PlayerJump / PlayerFall / PlayerDash / PlayerDoubleJum
 - 열쇠 수치 전부 `KeyDataSO` 집중 — 무기 컴포넌트 Inspector 수치 필드 제거
 - `WeaponEntry.weapon` = `MonoBehaviour` 타입 → Inspector 에서 구현체 드래그 연결 가능
 - 런타임 `as PlayerWeaponBase` 캐스팅 — 미상속 컴포넌트 연결 시 LogError 출력
-- 열쇠 교체 흐름: `KeyInventoryDataSO.EquipKey()` → `OnKeyEquipped` → `WeaponKeyController` 처리
+- 열쇠 교체 흐름: `KeyInventoryDataSO.EquipKey()` → `OnKeyEquipped` → `PlayerWeaponController` 처리
 - 무기 컴포넌트 전부 비활성 대기, 장착 시에만 `enabled = true`
 - `AnimatorOverrideController` 스왑 자리 확보 — 스프라이트 완성 후 활성화
 
@@ -131,12 +131,12 @@ PlayerIdle / PlayerMove / PlayerJump / PlayerFall / PlayerDash / PlayerDoubleJum
 
 - 방식: `Player.controller` Base Layer(이동) + Attack Layer(공격) + `AnimatorOverrideController`
 - 달리면서 공격, 공중 공격 모두 자연스럽게 처리 가능
-- **현재 보류** — 스프라이트 없음. 완성 후 `WeaponAnimator.cs` 작성
+- **현재 보류** — 스프라이트 없음. 완성 후 `PlayerWeaponAnimator.cs` 작성
 
 **Inspector 연결 방법**
 
 ```
-WeaponKeyController
+PlayerWeaponController
 └── Weapon Entries
       [0] keyType = Rusty  /  weapon = RustyKeyWeapon 컴포넌트 드래그
       [1] keyType = Hook   /  weapon = HookKeyWeapon 컴포넌트 드래그 (추후)
@@ -148,7 +148,7 @@ WeaponKeyController
 - [ ] `RustyKeyData.asset` 생성 (Create → KEY → Key Data)
 - [ ] `KeyInventory.asset` 생성 (Create → KEY → Key Inventory)
 - [ ] `KeyInventory.asset._defaultKeys[0]` = RustyKeyData.asset
-- [ ] Weapon 오브젝트에 `WeaponKeyController` 추가
+- [ ] Weapon 오브젝트에 `PlayerWeaponController` 추가
 - [ ] `_inventory` = KeyInventory.asset 연결
 - [ ] `_weaponEntries[0]` keyType = Rusty, weapon = RustyKeyWeapon 컴포넌트
 
@@ -171,7 +171,7 @@ WeaponKeyController
 |---|---|---|
 | 자물쇠 해제 조건 기획 | 🔲 미정 | 적 AI 구현 후 결정 |
 | 무기 Animator Controller | 🔲 보류 | 스프라이트 완성 후 |
-| `WeaponAnimator.cs` | 🔲 보류 | 스프라이트 완성 후 |
+| `PlayerWeaponAnimator.cs` | 🔲 보류 | 스프라이트 완성 후 |
 | `EnemyBase.cs` | 🔲 미착수 | v0.4 예정 |
 | `EnemyAI.cs` | 🔲 미착수 | v0.4 예정 |
 | `LockComponent.cs` | 🔲 미착수 | v0.4 예정 |
@@ -282,7 +282,7 @@ Linear Drag  : 0 (코드에서 직접 제어하므로 무관)
 **작업 내용**
 
 1. 공용 계층 3종 (`EnemySensor`, `EnemyAI`, `EnemyAttackBase`) 설계 및 구현
-2. 기사형 전용 구현체 3종 (`KnightDataSO`, `KnightAI`, `KnightAttack`, `EnemyKnight`)
+2. 기사형 전용 구현체 3종 (`KnightDataSO`, `KnightAI`, `EnemyKnightAttack`, `EnemyKnight`)
 3. 기존 `EnemyBase`, `EnemyDataSO` 연계
 
 **완성 파일**
@@ -294,12 +294,12 @@ Linear Drag  : 0 (코드에서 직접 제어하므로 무관)
 | `EnemyAttackBase.cs` | 공용 추상 | 공격 쿨타임 + 히트박스 공통 처리 | v1.0 |
 | `KnightDataSO.cs` | Knight | EnemyDataSO 상속, 이동/감지/공격 수치 | v1.0 |
 | `KnightAI.cs` | Knight | EnemyAI 상속, 순찰/추격 이동 구현 | v1.0 |
-| `KnightAttack.cs` | Knight | EnemyAttackBase 상속, 내려치기 단타 | v1.0 |
+| `EnemyKnightAttack.cs` | Knight | EnemyAttackBase 상속, 내려치기 단타 | v1.0 |
 | `EnemyKnight.cs` | Knight | EnemyBase 상속, 방패+자물쇠 피격 판단 | v1.0 |
 
 **구조 결정 사항**
 
-- 데이터 흐름: `KnightAI.Start()` → `SetData()` → `EnemySensor` + `KnightAttack` 에 주입
+- 데이터 흐름: `KnightAI.Start()` → `SetData()` → `EnemySensor` + `EnemyKnightAttack` 에 주입
 - 정면/후면 판단: `DamageInfo.Direction` × `KnightAI.FacingDirection` dot product
   - 음수 = 정면 공격 = 방패 막힘
   - 양수 = 후면 공격 = 자물쇠 피격
@@ -311,7 +311,7 @@ Linear Drag  : 0 (코드에서 직접 제어하므로 무관)
 - [ ] 신규 파일 7개 import
 - [ ] `KnightData.asset` 생성 (Create → KEY → Knight Data)
 - [ ] `Enemy_Knight` 오브젝트 구성:
-  - `EnemyKnight`, `KnightAI`, `KnightAttack`, `EnemySensor` 부착
+  - `EnemyKnight`, `KnightAI`, `EnemyKnightAttack`, `EnemySensor` 부착
   - `Rigidbody2D` (gravityScale=1, FreezeRotation Z)
   - `CapsuleCollider2D`
 - [ ] `Lock_Back` 자식 생성 → `LockComponent`, `BoxCollider2D`(isTrigger=ON)
@@ -349,7 +349,7 @@ Linear Drag  : 0 (코드에서 직접 제어하므로 무관)
 | `EnemyDataSO.cs` | v2.0 — EnemyType enum + 전 타입 수치 통합 |
 | `EnemyAI.cs` | v2.0 — 추상 클래스→일반 클래스, switch 분기 |
 | `EnemySensor.cs` | KnightDataSO → EnemyDataSO 참조 교체 |
-| `KnightAttack.cs` | v1.1 — KnightDataSO → EnemyDataSO 참조 교체 |
+| `EnemyKnightAttack.cs` | v1.1 — KnightDataSO → EnemyDataSO 참조 교체 |
 | `EnemyKnight.cs` | v1.1 — KnightAI → EnemyAI 참조 교체 |
 | ~~`KnightAI.cs`~~ | 삭제 — EnemyAI 로 통합 |
 | ~~`KnightDataSO.cs`~~ | 삭제 — EnemyDataSO 로 통합 |
@@ -360,7 +360,7 @@ Linear Drag  : 0 (코드에서 직접 제어하므로 무관)
 Enemy_Knight
 ├── [EnemyKnight]     피격 로직 (EnemyBase 상속)
 ├── [EnemyAI]         AI 상태머신 — enemyType=Knight 설정
-├── [KnightAttack]    공격 구현체 (EnemyAttackBase 상속)
+├── [EnemyKnightAttack]    공격 구현체 (EnemyAttackBase 상속)
 ├── [EnemySensor]     감지 전담
 ├── [Rigidbody2D]
 └── ...
@@ -375,3 +375,77 @@ Enemy_Knight
 4. EnemyAttackBase 상속 공격 클래스 작성 (모션이 다른 경우)
 → EnemyAI 컴포넌트 자체는 교체 없음
 ```
+
+---
+
+### v0.6 — 무기 스윙 이동 + PlayerWeaponAnimator
+
+**작업 내용**
+
+1. `KeyDataSO` v1.1 — 스윙 이동 수치 섹션 추가 (`swingDistance` / `swingDuration` / `returnDuration` / `airSwingDistance`)
+2. `PlayerWeaponMover.cs` — Weapon 오브젝트 DOTween 스윙 이동 전담
+3. `PlayerWeaponAnimator.cs` — 무기 이벤트 구독, Animator Trigger 발행 + PlayerWeaponMover 연동
+4. `PlayerWeaponController.cs` — 열쇠 교체 시 PlayerWeaponAnimator.SetWeapon() / PlayerWeaponMover.SetKeyData() 연동
+
+**완성 파일**
+
+| 파일 | 역할 | 버전 |
+|---|---|---|
+| `KeyDataSO.cs` | 스윙 수치 추가 | v1.1 |
+| `PlayerWeaponMover.cs` | Weapon 오브젝트 스윙 이동 (신규) | v1.0 |
+| `PlayerWeaponAnimator.cs` | Animator Trigger + PlayerWeaponMover 연동 (신규) | v1.0 |
+| `PlayerWeaponController.cs` | PlayerWeaponAnimator / PlayerWeaponMover 연동 추가 | v1.2 |
+
+**스윙 이동 흐름**
+
+```
+RustyKeyWeapon.OnCombo1Started
+  → PlayerWeaponAnimator.HandleCombo1()
+      → Animator.SetTrigger("AttackCombo1")   (Attack Layer — 스프라이트 후 클립 연결)
+      → PlayerWeaponMover.PlaySwing(AttackType.Combo1)
+          → DOLocalMove(앞으로 swingDistance, swingDuration, Ease.OutQuart)
+          → WaitForSeconds(hitboxDuration - swingDuration) 유지
+          → DOLocalMove(원점, returnDuration, Ease.InQuart)
+```
+
+**콤보별 이동 방향**
+
+| 공격 | 이동 방향 | 거리 |
+|---|---|---|
+| Combo1 / Combo2 / Combo3 | FacingDirection(X) 앞으로 | swingDistance |
+| AirAttack | Y 음수(아래) + X 소량 | airSwingDistance |
+
+**KeyDataSO 스윙 기본값**
+
+```
+swingDistance    : 0.5  (앞으로 이동 거리)
+swingDuration    : 0.08 (앞으로 뻗는 시간)
+returnDuration   : 0.15 (복귀 시간)
+airSwingDistance : 0.4  (공중 아래 이동 거리)
+```
+
+**Attack Layer 파라미터 (Player.controller 에 추가 필요)**
+
+```
+AttackCombo1 (Trigger)
+AttackCombo2 (Trigger)
+AttackCombo3 (Trigger)
+AirAttack    (Trigger)
+스테이트: Empty → Combo1/2/3/AirAttack → Empty (ExitTime)
+클립: 스프라이트 완성 후 연결
+```
+
+**유니티 적용 체크리스트**
+
+- [ ] `KeyDataSO.cs` / `PlayerWeaponMover.cs` / `PlayerWeaponAnimator.cs` / `PlayerWeaponController.cs` 교체
+- [ ] Player 루트에 `PlayerWeaponAnimator` 컴포넌트 추가
+- [ ] Weapon 오브젝트에 `PlayerWeaponMover` 컴포넌트 추가
+- [ ] `Player.controller` Attack Layer 추가:
+  - 파라미터 4개 (AttackCombo1 / AttackCombo2 / AttackCombo3 / AirAttack, 모두 Trigger)
+  - Empty 스테이트 + 각 공격 스테이트 + ExitTime 전환
+- [ ] `RustyKeyData.asset` 스윙 수치 설정
+
+**다음 작업 예정**
+
+- [ ] Player.controller Attack Layer 구조 완성 가이드
+- [ ] 스프라이트 완성 후 클립 연결 + AnimatorOverrideController 세팅
