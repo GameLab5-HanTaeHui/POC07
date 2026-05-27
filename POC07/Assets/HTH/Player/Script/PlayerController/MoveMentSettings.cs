@@ -20,7 +20,7 @@
 
 using UnityEngine;
 
-namespace PlayerMovement
+namespace KEY
 {
     /// <summary>
     /// 플레이어 이동 전체 수치를 보관하는 ScriptableObject. (v1.0)

@@ -30,7 +30,7 @@
 
 using UnityEngine;
 
-namespace PlayerMovement
+namespace KEY
 {
     /// <summary>
     /// 모든 Animator 파라미터를 관리하는 단독 컴포넌트. (v1.1)

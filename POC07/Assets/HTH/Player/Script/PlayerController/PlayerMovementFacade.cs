@@ -1,49 +1,30 @@
 ﻿// ============================================================
-// PlayerMovementFacade.cs  v1.0
+// PlayerMovementFacade.cs  v1.1
 // 플레이어 이동 패키지 — 외부 단일 진입점
 //
-// [독립 패키지]
-//   namespace : PlayerMovement (HOSE 종속 없음)
-//   의존 대상 : PlayerMover, MovementInput, MovementAnimator
-//
-// [역할]
-//   외부 코드가 이동 패키지에 접근하는 유일한 창구.
-//   PlayerMovementFacade.Instance 하나로 모든 이동 상태 조회 가능.
-//
-// [싱글턴 주의]
-//   Player 는 씬마다 새로 생성되는 오브젝트.
-//   DontDestroyOnLoad 사용 금지.
-//   씬 전환 시 파괴 → OnDestroy 에서 Instance = null 초기화.
-//   다음 씬에서 Awake() 에 의해 재설정.
-//
-//   중복 Instance 발생 시:
-//   Destroy(gameObject) ❌ — Player 오브젝트 전체 삭제
-//   Destroy(this)       ✅ — 컴포넌트만 제거 (Player 오브젝트 유지)
+// [v1.1 변경]
+//   MovementInput → InputManager 참조 교체.
+//   BlockJump / UnblockJump 를 InputManager.Instance 경유로 호출.
+//   namespace : KEY 로 변경.
 // ============================================================
 
 using UnityEngine;
 
-namespace PlayerMovement
+namespace KEY
 {
     /// <summary>
-    /// 플레이어 이동 패키지 외부 단일 진입점. (v1.0)
+    /// 플레이어 이동 패키지 외부 단일 진입점. (v1.1)
     ///
+    /// ────────────────────────────────────────────────────
     /// [사용법 — 외부 코드]
-    ///   // 이동 중인지 확인
-    ///   bool isMoving = PlayerMovementFacade.Instance.IsMoving;
-    ///
-    ///   // 접지 여부 확인
     ///   bool grounded = PlayerMovementFacade.Instance.IsGrounded;
-    ///
-    ///   // 점프 차단 (인벤토리 열릴 때)
-    ///   PlayerMovementFacade.Instance.BlockJump();
-    ///
-    ///   // 분사 중 Animator 파라미터 전달 (전투 시스템에서 호출)
+    ///   bool dashing  = PlayerMovementFacade.Instance.IsDashing;
     ///   PlayerMovementFacade.Instance.SetFiring(true);
     ///
-    /// [Facade 패턴]
-    ///   외부는 PlayerMover / MovementInput / MovementAnimator 를 몰라도 된다.
-    ///   이 클래스 하나로 필요한 모든 기능에 접근한다.
+    /// [점프 차단은 InputManager 경유]
+    ///   PlayerMovementFacade.Instance.BlockJump();
+    ///   PlayerMovementFacade.Instance.UnblockJump();
+    /// ────────────────────────────────────────────────────
     /// </summary>
     public class PlayerMovementFacade : MonoBehaviour
     {
@@ -53,7 +34,7 @@ namespace PlayerMovement
 
         /// <summary>
         /// 전역 단일 인스턴스.
-        /// 씬 전환 시 Player 가 파괴되면 null 로 초기화됨.
+        /// 씬 전환 시 파괴되면 null 로 초기화.
         /// </summary>
         public static PlayerMovementFacade Instance { get; private set; }
 
@@ -62,7 +43,6 @@ namespace PlayerMovement
         // ──────────────────────────────────────────
 
         private PlayerMover _mover;
-        private MovementInput _input;
         private MovementAnimator _anim;
 
         // ──────────────────────────────────────────
@@ -80,14 +60,11 @@ namespace PlayerMovement
 
         /// <summary>
         /// 현재 바라보는 방향. 1 = 오른쪽, -1 = 왼쪽.
-        /// 스프라이트 반전, 투사체 방향 등에 사용.
+        /// 무기 공격 방향, 투사체 방향 등에 사용.
         /// </summary>
         public float FacingDirection => _mover?.FacingDirection ?? 1f;
 
-        /// <summary>
-        /// 연결된 MovementSettings SO.
-        /// 외부에서 수치를 읽거나 런타임에 수정할 때 사용.
-        /// </summary>
+        /// <summary> 연결된 MovementSettings SO. </summary>
         public MovementSettings Settings => _mover?.Settings;
 
         // ══════════════════════════════════════════════════════
@@ -96,29 +73,19 @@ namespace PlayerMovement
 
         private void Awake()
         {
-            // ── 싱글턴 보장 ──────────────────────
-            // Destroy(gameObject) 가 아닌 Destroy(this) 로 컴포넌트만 제거.
-            // Player 오브젝트 전체를 날리면 Hierarchy 에서 사라지는 버그 발생.
-            if (Instance != null && Instance != this)
-            {
-                Destroy(this);
-                return;
-            }
+            if (Instance != null && Instance != this) { Destroy(this); return; }
             Instance = this;
 
-            // ── 내부 컴포넌트 취득 ──────────────────────
             _mover = GetComponent<PlayerMover>();
-            _input = GetComponent<MovementInput>();
             _anim = GetComponent<MovementAnimator>();
 
-            if (_mover == null) Debug.LogError("[PlayerMovementFacade] PlayerMover 없음. Player 오브젝트에 부착 필요.");
-            if (_input == null) Debug.LogError("[PlayerMovementFacade] MovementInput 없음. Player 오브젝트에 부착 필요.");
+            if (_mover == null)
+                Debug.LogError("[PlayerMovementFacade] PlayerMover 없음.");
         }
 
         private void OnDestroy()
         {
-            if (Instance == this)
-                Instance = null;
+            if (Instance == this) Instance = null;
         }
 
         // ══════════════════════════════════════════════════════
@@ -126,30 +93,18 @@ namespace PlayerMovement
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 점프 입력을 차단한다.
-        ///
-        /// [사용 예시]
-        ///   인벤토리 UI 열릴 때:
-        ///     PlayerMovementFacade.Instance.BlockJump();
-        ///   인벤토리 UI 닫힐 때:
-        ///     PlayerMovementFacade.Instance.UnblockJump();
+        /// 점프 입력을 차단한다. InputManager 경유.
         /// </summary>
-        public void BlockJump() => _input?.BlockJump();
+        public void BlockJump() => InputManager.Instance?.BlockJump();
 
         /// <summary>
-        /// 점프 차단을 해제한다.
+        /// 점프 차단을 해제한다. InputManager 경유.
         /// </summary>
-        public void UnblockJump() => _input?.UnblockJump();
+        public void UnblockJump() => InputManager.Instance?.UnblockJump();
 
         /// <summary>
         /// 분사/공격 상태를 Animator IsFiring 파라미터에 전달한다.
-        ///
-        /// [사용 예시]
-        ///   전투 시스템(PlayerCombat 등)에서:
-        ///     PlayerMovementFacade.Instance.SetFiring(true);   // 발사 시작
-        ///     PlayerMovementFacade.Instance.SetFiring(false);  // 발사 중단
-        ///
-        ///   이동 패키지 없이 전투만 쓰는 경우 호출하지 않아도 됨.
+        /// 전투 시스템(PlayerWeaponBase 등)에서 호출.
         /// </summary>
         public void SetFiring(bool isFiring) => _anim?.SetFiring(isFiring);
     }
