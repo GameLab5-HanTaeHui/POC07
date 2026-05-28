@@ -20,29 +20,28 @@ Player
 ├── [InputManager]               * 모든 키 입력 통합 (이동 + 무기)
 ├── [PlayerMover]                * 이동 / 점프 / 대쉬 물리
 │     └── (SO) MovementSettings  * 이동 수치 설정
-├── [MovementAnimator]             Animator 파라미터 동기화
+├── [MovementAnimator]             Animator 파라미터 동기화 (v2.1)
 ├── [PlayerMovementFacade]         외부 단일 진입점 (싱글턴)
 ├── [Animator]                   * Player.controller 연결
-├── [Rigidbody2D]                * Gravity Scale = MovementSettings.GravityScale
+├── [Rigidbody2D]                * Collision Detection = Continuous 권장
+│                                  Gravity Scale = MovementSettings.GravityScale
 ├── [SpriteRenderer]             * 플레이어 스프라이트
 ├── [CapsuleCollider2D]          * 물리 충돌 콜라이더
 │
 ├── GroundCheck                    발 아래 빈 오브젝트 (지면 감지 기준점)
-│     └── Transform 만 존재
 │
 └── Weapon
-      ├── [PlayerWeaponController]  * 열쇠 교체 핵심 컨트롤러
+      ├── [PlayerWeaponController]  * 열쇠 교체 핵심 컨트롤러 (v1.4)
       │     ├── (SO) KeyInventoryDataSO  * 보유 열쇠 목록
-      │     ├── _weaponEntries[0]  keyType=Rusty  / weapon=RustyKeyWeapon
-      │     └── _weaponEntries[1]  keyType=Hook   / weapon=HookKeyWeapon (추후)
+      │     ├── _weaponEntries[0]  keyType=Rusty / weapon=RustyKeyWeapon / sealData=(비움)
+      │     └── _weaponEntries[1]  keyType=Seal  / weapon=SealKeyWeapon  / sealData=SealData_Dash.asset
       │
       ├── [RustyKeyWeapon]         비활성 대기 (KeyType.Rusty)
-      │     └── KeyDataSO 는 PlayerWeaponController 가 런타임 주입
-      ├── [HookKeyWeapon]          비활성 대기 (KeyType.Hook)   ← 추후
-      ├── [SpringKeyWeapon]        비활성 대기 (KeyType.Spring) ← 추후
+      ├── [SealKeyWeapon]          비활성 대기 (KeyType.Seal)
+      │     └── _projectilePrefab = SealProjectile.prefab
       │
-      ├── [PlayerWeaponAnimator]        무기 이벤트 구독 → Trigger 발행 + PlayerWeaponMover 호출
-      ├── [PlayerWeaponMover]           DOTween 스윙 이동 전담
+      ├── [PlayerWeaponAnimator]        무기 이벤트 구독 → PlayerWeaponMover 호출
+      ├── [PlayerWeaponMover]           DOTween 스윙 이동 전담 (v1.1)
       └── [PlayerWeaponHitboxManager] * 히트박스 관리
             ├── Hitbox_Combo1    [BoxCollider2D] isTrigger=ON
             ├── Hitbox_Combo2    [BoxCollider2D] isTrigger=ON
@@ -59,13 +58,33 @@ Player
 | PlayerMover | _trailRenderer | (선택) TrailRenderer |
 | PlayerWeaponController | _inventory | KeyInventoryDataSO |
 | PlayerWeaponController | _weaponEntries[0] | keyType=Rusty / weapon=RustyKeyWeapon |
-| PlayerWeaponController | _animator | Player Animator (추후) |
+| PlayerWeaponController | _weaponEntries[1] | keyType=Seal / weapon=SealKeyWeapon / sealData=SealData_Dash.asset |
+| PlayerWeaponController | _movementAnimator | MovementAnimator |
+| PlayerWeaponController | _weaponAnimator | PlayerWeaponAnimator |
+| PlayerWeaponController | _weaponMover | PlayerWeaponMover |
 | RustyKeyWeapon | _hitboxManager | PlayerWeaponHitboxManager |
+| SealKeyWeapon | _projectilePrefab | SealProjectile.prefab |
+| SealKeyWeapon | _firePoint | (선택) FirePoint Transform |
 | PlayerWeaponAnimator | _weaponMover | PlayerWeaponMover (자동 탐색) |
-| PlayerWeaponMover | (자동 초기화) | Awake 에서 localPosition 캐싱 |
 | PlayerWeaponHitboxManager | _hitboxes[0~3] | 각 Hitbox BoxCollider2D |
 | PlayerWeaponHitboxManager | _hitLayer | Enemy 레이어 |
 | Animator | Controller | Player.controller |
+
+---
+
+## SealProjectile (Prefab)
+
+```
+SealProjectile (Prefab)
+├── [SealProjectile]         봉인 투사체 컴포넌트
+│     └── _sealLayer = Enemy 레이어
+├── [Rigidbody2D]            GravityScale=0 / Collision Detection=Continuous
+├── [CircleCollider2D]       isTrigger=true / radius=0.15
+└── [SpriteRenderer]         (스프라이트는 SealDataSO.projectileSprite 런타임 적용)
+```
+
+**저장 경로**: `Assets/KEY/Prefabs/SealProjectile.prefab`
+**Layer**: `PlayerHitbox` (기존 플레이어 무기 레이어와 동일)
 
 ---
 
@@ -77,8 +96,12 @@ Assets/KEY/DataSO/
 
 Assets/KEY/DataSO/Keys/
   RustyKeyData.asset          녹슨 열쇠 (KeyDataSO)
-  HookKeyData.asset           갈고리 열쇠 ← 추후
-  SpringKeyData.asset         태엽 열쇠   ← 추후
+
+Assets/KEY/DataSO/Seals/
+  SealData_Dash.asset         돌진 봉인 (SealDataSO / sealType=Dash)
+  SealData_Guard.asset        방어 봉인 (SealDataSO / sealType=Guard)
+  SealData_Move.asset         이동 봉인 (SealDataSO / sealType=Move)
+  SealData_Attack.asset       공격 봉인 (SealDataSO / sealType=Attack)
 
 Assets/KEY/DataSO/Inventory/
   KeyInventory.asset          보유 열쇠 목록 SO (KeyInventoryDataSO)
@@ -90,41 +113,19 @@ Assets/KEY/DataSO/Enemy/
   KnightData.asset            기사형 수치 (EnemyDataSO / enemyType=Knight)
 ```
 
-### RustyKeyData.asset 기본값
+### SealData_Dash.asset 기본값
 
 ```
-keyName             : 녹슨 열쇠
-keyType             : KeyType.Rusty
-baseDamage          : 10
-comboCount          : 3
-comboWindowTime     : 0.8
-hitboxDuration      : 0.15
-comboMultipliers    : [1.0, 1.2, 1.5]
-airAttackMultiplier : 1.3
-keySprite           : (추후)
-overrideController  : (추후)
-```
-
----
-
-## MovementSettings SO 기본값
-
-```
-MoveSpeed            : 5
-JumpForce            : 14
-MaxJumpCount         : 2
-DoubleJumpMultiplier : 0.85
-CoyoteTime           : 0.1
-JumpBufferTime       : 0.15
-GravityScale         : 3
-DashDistance         : 5
-DashDuration         : 0.2
-DashCooldown         : 2.3
-DashGravityScale     : 0
-DashBodyWidth        : 0.25
-GroundLayer          : Ground 레이어 *
-GroundCheckRadius    : 0.1
-DashWallLayer        : Ground + Wall 레이어 *
+sealKeyName       : 봉인 열쇠 (돌진)
+sealType          : SealType.Dash
+sealDuration      : 4.0
+maxSealCount      : 2
+projectileSpeed   : 12.0
+projectileLifetime: 2.0
+projectileScale   : 1.0
+cooldown          : 1.5
+sealFlashInterval : 0.4
+sealColor         : (0.3, 0.5, 1.0, 1.0)  ← 파란색
 ```
 
 ---
@@ -132,23 +133,35 @@ DashWallLayer        : Ground + Wall 레이어 *
 ## Animator Controller — Player.controller
 
 ```
-Base Layer (이동)
+Base Layer (이동 + 공격 통합)
   파라미터
-    Speed      (Float)   Mathf.Abs(MoveInput)
-    IsGrounded (Bool)    PlayerMover.IsGrounded
-    IsFiring   (Bool)    PlayerMovementFacade.SetFiring()
-    Dash       (Trigger) PlayerMover.OnDashStarted
-    DoubleJump (Trigger) PlayerMover.OnDoubleJumped
+    Speed       (Float)   Mathf.Abs(MoveInput)
+    VelocityY   (Float)   Rigidbody2D.velocity.y
+    IsGrounded  (Bool)    PlayerMover.IsGrounded
+    IsFiring    (Bool)    PlayerMovementFacade.SetFiring()
+    Jump        (Trigger) PlayerMover.OnJumped
+    DoubleJump  (Trigger) PlayerMover.OnDoubleJumped
+    Dash        (Trigger) PlayerMover.OnDashStarted
+    AttackCombo1 (Trigger) RustyKeyWeapon.OnCombo1Started
+    AttackCombo2 (Trigger) RustyKeyWeapon.OnCombo2Started
+    AttackCombo3 (Trigger) RustyKeyWeapon.OnCombo3Started
+    AirAttack   (Trigger) RustyKeyWeapon.OnAirAttackStarted
 
   스테이트
     PlayerIdle / PlayerMove / PlayerJump / PlayerFall
     PlayerDash / PlayerDoubleJump
+    PlayerAttack01 / PlayerAttack02 / PlayerAttack03
+    PlayerAirAttack
 
-Attack Layer — 스프라이트 완성 후 추가 예정
-  파라미터 (예정)
-    AttackCombo1 / AttackCombo2 / AttackCombo3 / AirAttack (Trigger)
-  AnimatorOverrideController
-    열쇠 교체 시 PlayerWeaponController.TrySwapAnimatorOverride() 로 스왑
+  전환 규칙
+    Idle/Move → PlayerJump      : Jump Trigger
+    PlayerJump → PlayerFall     : VelocityY < -0.1
+    AnyState → PlayerAttack01   : AttackCombo1 + IsGrounded=true
+    Attack01 → Attack02         : AttackCombo2 + ExitTime=0.5
+    Attack02 → Attack03         : AttackCombo3 + ExitTime=0.5
+    Attack01/02/03 → PlayerIdle : ExitTime=1.0 (Loop Time=OFF 필수)
+    AnyState → PlayerAirAttack  : AirAttack + IsGrounded=false
+    PlayerAirAttack → PlayerFall: ExitTime=1.0
 ```
 
 ---
@@ -159,6 +172,7 @@ Attack Layer — 스프라이트 완성 후 추가 예정
 |---|---|
 | Player | Player |
 | Hitbox_* (플레이어 무기) | PlayerHitbox |
+| SealProjectile | PlayerHitbox |
 | Enemy_* | Enemy |
 | Lock_* (자물쇠) | PlayerHitbox 감지 대상 |
 | AttackHitbox (적 공격) | Player 감지 대상 |
@@ -176,25 +190,6 @@ Enemy_Dummy
 └── [SpriteRenderer]
 ```
 
-### 컴포넌트 연결
-
-| 컴포넌트 | 연결 항목 | 값 |
-|---|---|---|
-| EnemyDummy | _settings | DummyData.asset |
-
-### DummyData.asset 기본값
-
-```
-enemyName        : 더미
-enemyType        : EnemyType.Dummy
-maxHp            : 100
-knockbackForce   : 5
-knockbackDecay   : 0.8
-iFrameDuration   : 0.3
-hitFlashInterval : 0.07
-(이동/감지/공격 수치 — 미사용)
-```
-
 ---
 
 ## Enemy_DummyLocked (자물쇠 있는 더미)
@@ -205,20 +200,12 @@ Enemy_DummyLocked
 │     └── (SO) EnemyDataSO  * enemyType=DummyLocked
 ├── [Rigidbody2D]          gravityScale=1 / FreezeRotation Z
 ├── [CapsuleCollider2D]    물리 충돌
-├── [SpriteRenderer]       본체 스프라이트
-└── Lock                   자물쇠 자식 오브젝트
+├── [SpriteRenderer]
+└── Lock
       ├── [LockComponent]  피격 횟수 누적 / 해제 이벤트
-      ├── [SpriteRenderer] 자물쇠 스프라이트
+      ├── [SpriteRenderer]
       └── [BoxCollider2D]  isTrigger=ON
 ```
-
-### 컴포넌트 연결
-
-| 컴포넌트 | 연결 항목 | 값 |
-|---|---|---|
-| EnemyDummyLocked | _settings | DummyLockedData.asset |
-| EnemyDummyLocked | _lockComponent | Lock 오브젝트의 LockComponent |
-| LockComponent | _requiredHitCount | 3 (기본값) |
 
 ---
 
@@ -226,25 +213,31 @@ Enemy_DummyLocked
 
 ```
 Enemy_Knight
-├── [EnemyKnight]          EnemyBase 상속 — 정면 방패 / 등 뒤 자물쇠 피격 판단
-├── [EnemyAI]              * 공용 AI 상태머신 — enemyType=Knight 로 행동 분기
-│     └── (SO) EnemyDataSO  * KnightData.asset
-├── [EnemyKnightAttack]           EnemyAttackBase 상속 — 근접 내려치기 단타
-├── [EnemySensor]            공용 감지 컴포넌트 (EnemyAI 가 데이터 주입)
-├── [Rigidbody2D]            gravityScale=1 / FreezeRotation Z
-├── [CapsuleCollider2D]      물리 충돌
+├── [EnemyKnight]                EnemyBase 상속 — 방패/자물쇠 피격 판단 (v1.2)
+│     └── (SO) EnemyDataSO       * KnightData.asset
+├── [EnemyAI]                    공용 AI 상태머신 — enemyType=Knight (v3.0)
+│     └── (SO) EnemyDataSO       * KnightData.asset
+├── [EnemyKnightAttack]          EnemyAttackBase 상속 — 근접 내려치기
+├── [EnemySensor]                공용 감지 컴포넌트
+├── [EnemySealComponent]         봉인 상태 관리 (v1.0)  ← v0.10 신규
+│     └── _overlayRenderer = SealOverlay/SpriteRenderer
+├── [Rigidbody2D]                gravityScale=1 / FreezeRotation Z
+├── [CapsuleCollider2D]
 ├── [SpriteRenderer]
 │
-├── Lock_Back                등 뒤 자물쇠
-│     ├── [LockComponent]    피격 횟수 누적 / 해제 이벤트
-│     ├── [SpriteRenderer]   자물쇠 스프라이트
-│     └── [BoxCollider2D]    isTrigger=ON
+├── Lock_Back                    등 뒤 자물쇠
+│     ├── [LockComponent]
+│     ├── [SpriteRenderer]
+│     └── [BoxCollider2D]        isTrigger=ON
 │
-└── AttackHitbox             기사 공격 히트박스
-      └── [BoxCollider2D]    isTrigger=ON
+├── AttackHitbox                 기사 공격 히트박스
+│     └── [BoxCollider2D]        isTrigger=ON
+│
+└── SealOverlay                  봉인 오버레이 (v0.10 신규)
+      └── [SpriteRenderer]       EnemySealComponent._overlayRenderer 에 연결
 ```
 
-### 컴포넌트 연결
+### Enemy_Knight 컴포넌트 연결
 
 | 컴포넌트 | 연결 항목 | 값 |
 |---|---|---|
@@ -252,6 +245,35 @@ Enemy_Knight
 | EnemyKnight | _backLock | Lock_Back의 LockComponent |
 | EnemyAI | _settings | KnightData.asset |
 | EnemyKnightAttack | _hitbox | AttackHitbox의 BoxCollider2D |
+| EnemySealComponent | _overlayRenderer | SealOverlay/SpriteRenderer |
+
+### EnemyAI 봉인 체크 (v3.0)
+
+```
+OnPatrolMove()  : IsSealed(Move) || IsSealed(Dash) → StopHorizontal()
+OnChaseMove()   : IsSealed(Move)                   → StopHorizontal()
+OnEnterAttack() : IsSealed(Attack)                 → ChangeState(Chase)
+```
+
+### EnemyKnight Guard 봉인 체크 (v1.2)
+
+```
+TakeDamage(info)
+  자물쇠 해제됨?       → EnemyBase.TakeDamage()
+  Guard 봉인 활성?     → 방패 무시 → EnemyBase.TakeDamage()
+  정면 공격 (Guard 없음) → 방패 막힘 플래시
+  후면 공격 (Guard 없음) → LockComponent.TakeDamage()
+```
+
+### EnemySensor Gizmos 색상 범례
+
+```
+노란선  : 순찰 직선 감지 Ray (patrolSightRange)
+빨간선  : 벽 감지 Ray (wallCheckDistance)
+보라선  : 낭떠러지 하향 Ray (cliffCheckDistance)
+주황원  : 추격 OverlapCircle (chaseSightRadius)
+빨간원  : 공격 사정거리 (attackRange)
+```
 
 ### KnightData.asset 기본값
 
@@ -279,28 +301,6 @@ attackCooldown     : 2.0
 attackDuration     : 0.3
 playerLayer        : Player *
 groundLayer        : Ground *
-```
-
-### EnemySensor Gizmos 색상 범례
-
-```
-노란선  : 순찰 직선 감지 Ray (patrolSightRange)
-빨간선  : 벽 감지 Ray (wallCheckDistance)
-보라선  : 낭떠러지 하향 Ray (cliffCheckDistance)
-주황원  : 추격 OverlapCircle (chaseSightRadius)
-빨간원  : 공격 사정거리 (attackRange)
-```
-
-### EnemyAI 상태 전환 규칙
-
-```
-Patrol ──(직선 감지)──→ Chase
-Patrol ──(벽/낭떠러지)─→ 방향 반전 → (idleChance 확률) → Idle
-Idle   ──(대기 완료)──→ Patrol
-Idle   ──(직선 감지)──→ Chase
-Chase  ──(사정거리)───→ Attack
-Chase  ──(범위 이탈)──→ Patrol
-Attack ──(완료)───────→ Chase
 ```
 
 ---

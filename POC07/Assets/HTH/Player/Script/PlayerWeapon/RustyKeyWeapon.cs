@@ -225,6 +225,7 @@ namespace KEY
             _currentStep = 0;
             _inputBuffered = false;
             _isAttacking = false;
+            _lastAttackInputFrame = -1;
 
             _hitboxManager?.DisableAllHitboxes();
             OnComboReset?.Invoke();

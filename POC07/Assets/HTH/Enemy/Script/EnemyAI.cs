@@ -1,18 +1,32 @@
 ﻿// ============================================================
-// EnemyAI.cs  v2.0
-// 적 공용 AI — 단일 컴포넌트, EnemyType 분기
+// EnemyAI.cs  v3.0
+// 적 공용 AI — 봉인 시스템 연동
+//
+// [v3.0 변경 — EnemySealComponent 연동]
+//   Awake 에서 EnemySealComponent 자동 취득.
+//   행동 실행 직전 IsSealedAction(SealType) 체크 추가.
+//
+//   [체크 위치 3곳]
+//     OnPatrolMove()  → SealType.Move / SealType.Dash
+//     OnChaseMove()   → SealType.Move
+//     OnEnterAttack() → SealType.Attack
+//
+//   [SealType.Move]
+//     Patrol / Chase 이동 전부 차단.
+//     이동 속도를 0 으로 유지하고 현재 상태를 변경하지 않음.
+//     봉인 해제 시 자동으로 이동 재개.
+//
+//   [SealType.Dash]
+//     OnPatrolMove 에서 Knight 의 돌진 유사 패턴 차단 전용.
+//     현재 Patrol 이동을 차단하여 전진 억제.
+//     추후 실제 Dash 패턴 추가 시 해당 위치에도 체크 추가.
+//
+//   [SealType.Attack]
+//     OnEnterAttack() 진입 시 체크.
+//     봉인 중이면 공격 실행 없이 Chase 로 복귀.
 //
 // [v2.0 변경]
 //   KnightAI 제거 → 이 파일 하나로 모든 적 AI 통합.
-//   추상 클래스 → 일반 클래스로 변경.
-//   OnPatrolMove / OnChaseMove / OnEnterAttack 내부에서
-//   switch(enemyType) 로 타입별 행동 분기.
-//
-// [새 적 추가 시]
-//   1. EnemyType 에 항목 추가
-//   2. 이 파일의 각 switch 에 케이스 추가
-//   3. EnemyBase / EnemyAttackBase 구현체 작성
-//   → EnemyAI 컴포넌트 자체는 교체 불필요
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -24,22 +38,20 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 공용 AI 컴포넌트. (v2.0)
+    /// 적 공용 AI 컴포넌트. (v3.0)
     ///
     /// ────────────────────────────────────────────────────
-    /// [상태머신]
-    ///   Patrol → (직선 감지) → Chase
-    ///   Patrol → (랜덤)     → Idle
-    ///   Idle   → (대기 완료) → Patrol
-    ///   Idle   → (직선 감지) → Chase
-    ///   Chase  → (사정거리)  → Attack
-    ///   Chase  → (범위 이탈) → Patrol
-    ///   Attack → (완료)      → Chase
+    /// [봉인 체크 흐름]
+    ///   SealProjectile → EnemySealComponent.ApplySeal()
+    ///     → _activeSeals 에 SealType 등록
+    ///       → EnemyAI 행동 시도 시 IsSealedAction() 확인
+    ///         → true 이면 해당 행동 스킵
     ///
-    /// [타입별 분기]
-    ///   OnPatrolMove / OnChaseMove / OnEnterAttack 에서
-    ///   switch(_settings.enemyType) 로 분기.
-    ///   Dummy 타입은 이동/공격 없음.
+    /// [봉인 해제 시]
+    ///   EnemySealComponent.Update() 에서 타이머 만료 감지
+    ///     → _activeSeals 에서 해당 타입 제거
+    ///       → 다음 프레임부터 EnemyAI 가 IsSealedAction() = false 로 판단
+    ///         → 행동 자동 재개
     /// ────────────────────────────────────────────────────
     /// </summary>
     [RequireComponent(typeof(EnemySensor))]
@@ -87,6 +99,13 @@ namespace KEY
         private Rigidbody2D _rigid2D;
         private SpriteRenderer _spriteRenderer;
 
+        /// <summary>
+        /// 봉인 상태 컴포넌트. v3.0 추가.
+        /// Awake 에서 자동 취득. 미부착 시 null 허용
+        /// (봉인 시스템 없이도 정상 동작).
+        /// </summary>
+        private EnemySealComponent _sealComponent;
+
         // ──────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────
@@ -115,6 +134,9 @@ namespace KEY
             _attack = GetComponent<EnemyAttackBase>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
+
+            // 봉인 컴포넌트 취득 — 없어도 경고 없음 (선택적 기능)
+            _sealComponent = GetComponent<EnemySealComponent>();
         }
 
         private void Start()
@@ -126,16 +148,13 @@ namespace KEY
                 return;
             }
 
-            // 센서에 수치 주입
             _sensor.SetData(_settings);
             _sensor.SetFacingDirection(_facingDirection);
 
-            // KnightAttack 에 데이터 주입 (EnemyAttackBase 구현체)
             var knightAttack = GetComponent<EnemyKnightAttack>();
             if (knightAttack != null)
                 knightAttack.SetData(_settings);
 
-            // 공격 완료 이벤트 구독
             if (_attack != null)
                 _attack.OnAttackFinished += () => ChangeState(AIState.Chase);
 
@@ -144,7 +163,6 @@ namespace KEY
                 _settings.enemyType == EnemyType.DummyLocked)
             {
                 enabled = false;
-                return;
             }
         }
 
@@ -162,6 +180,24 @@ namespace KEY
         private void FixedUpdate()
         {
             UpdateMovement();
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 봉인 체크 — 내부 유틸리티
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 지정 봉인 타입이 현재 활성 중인지 확인.
+        ///
+        /// [null 안전]
+        ///   _sealComponent 가 없으면 항상 false 반환.
+        ///   봉인 컴포넌트 미부착 적은 봉인 효과를 받지 않음.
+        /// </summary>
+        /// <param name="sealType">확인할 봉인 타입</param>
+        /// <returns>봉인 활성 중이면 true, 미활성 or 컴포넌트 없으면 false</returns>
+        private bool IsSealed(SealType sealType)
+        {
+            return _sealComponent != null && _sealComponent.IsSealedAction(sealType);
         }
 
         // ══════════════════════════════════════════════════════
@@ -225,15 +261,29 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // 상태별 행동 — EnemyType 분기
+        // 상태별 행동 — EnemyType 분기 + 봉인 체크
         // ══════════════════════════════════════════════════════
 
         /// <summary>
         /// 순찰 이동.
-        /// 타입별로 이동 방식이 다르면 여기서 분기.
+        ///
+        /// [봉인 체크]
+        ///   SealType.Move  : 이동 전체 차단 → 정지
+        ///   SealType.Dash  : Knight 전진 패턴 차단 → 정지
+        ///   (두 봉인 중 하나라도 활성이면 정지)
+        ///
+        /// [봉인 해제 후]
+        ///   다음 프레임 UpdateMovement() 에서 자동 재개.
         /// </summary>
         private void OnPatrolMove()
         {
+            // Move 또는 Dash 봉인 활성 시 순찰 이동 정지
+            if (IsSealed(SealType.Move) || IsSealed(SealType.Dash))
+            {
+                StopHorizontal();
+                return;
+            }
+
             switch (_settings.enemyType)
             {
                 case EnemyType.Knight:
@@ -242,21 +292,29 @@ namespace KEY
                         _rigid2D.linearVelocity.y);
                     break;
 
-                // 추후 Drone: 공중 이동 로직
-                // case EnemyType.Drone:
-                //     break;
-
+                // 추후 Drone 등 추가
                 default:
-                    // Dummy 타입 등 — 이동 없음 (Start 에서 AI 비활성 처리)
                     break;
             }
         }
 
         /// <summary>
         /// 추격 이동.
+        ///
+        /// [봉인 체크]
+        ///   SealType.Move : 이동 전체 차단 → 정지.
+        ///   Dash 봉인은 추격 이동에는 영향 없음
+        ///   (추격은 Dash 가 아닌 일반 이동 패턴).
         /// </summary>
         private void OnChaseMove()
         {
+            // Move 봉인 활성 시 추격 이동 정지
+            if (IsSealed(SealType.Move))
+            {
+                StopHorizontal();
+                return;
+            }
+
             switch (_settings.enemyType)
             {
                 case EnemyType.Knight:
@@ -272,11 +330,30 @@ namespace KEY
 
         /// <summary>
         /// 공격 상태 진입.
-        /// 이동 정지 후 타입별 공격 컴포넌트 실행.
+        ///
+        /// [봉인 체크]
+        ///   SealType.Attack : 공격 실행 차단 → 즉시 Chase 복귀.
+        ///   봉인 중에는 Attack 상태에 머무는 것 자체를 막음.
+        ///   Chase 로 복귀 후 사정거리 안에 있으면 재진입 시도하지만
+        ///   봉인이 유지되는 한 계속 차단됨.
+        ///
+        /// [SealType.Ranged]
+        ///   원거리 공격 전용 봉인.
+        ///   EnemyAttackBase 하위 클래스가 원거리 공격이라면
+        ///   해당 ExecuteAttack() 내부에서 별도 체크 권장.
+        ///   여기서는 Attack 봉인만 전역 차단.
         /// </summary>
         private void OnEnterAttack()
         {
             StopHorizontal();
+
+            // Attack 봉인 활성 시 공격 불가 → Chase 복귀
+            if (IsSealed(SealType.Attack))
+            {
+                Debug.Log($"[EnemyAI] 공격 봉인 활성 — 공격 차단 ({_settings.enemyName})");
+                ChangeState(AIState.Chase);
+                return;
+            }
 
             if (_attack == null)
             {
@@ -290,11 +367,6 @@ namespace KEY
                 case EnemyType.Knight:
                     _attack.TryAttack(_settings.attackCooldown);
                     break;
-
-                // 추후 Drone, Golem 등 추가
-                // case EnemyType.Drone:
-                //     _attack.TryAttack(_settings.attackCooldown);
-                //     break;
 
                 default:
                     ChangeState(AIState.Chase);
@@ -348,27 +420,29 @@ namespace KEY
             if (player == null) return;
 
             float dir = player.position.x > transform.position.x ? 1f : -1f;
-            if (Mathf.Approximately(dir, _facingDirection)) return;
-
-            _facingDirection = dir;
-            if (_spriteRenderer != null)
-                _spriteRenderer.flipX = _facingDirection < 0f;
-            _sensor.SetFacingDirection(_facingDirection);
+            if (!Mathf.Approximately(dir, _facingDirection))
+            {
+                _facingDirection = dir;
+                if (_spriteRenderer != null)
+                    _spriteRenderer.flipX = _facingDirection < 0f;
+                _sensor.SetFacingDirection(_facingDirection);
+            }
         }
 
         private void StopHorizontal()
         {
-            _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
+            if (_rigid2D != null)
+                _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
         }
 
         // ══════════════════════════════════════════════════════
-        // Idle 코루틴
+        // 코루틴
         // ══════════════════════════════════════════════════════
 
         private IEnumerator IdleRoutine()
         {
-            float wait = Random.Range(_settings.idleTimeMin, _settings.idleTimeMax);
-            yield return new WaitForSeconds(wait);
+            float idleTime = Random.Range(_settings.idleTimeMin, _settings.idleTimeMax);
+            yield return new WaitForSeconds(idleTime);
             ChangeState(AIState.Patrol);
         }
 
@@ -376,14 +450,17 @@ namespace KEY
         // Gizmos
         // ══════════════════════════════════════════════════════
 
+#if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-#if UNITY_EDITOR
+            if (_sealComponent == null || !_sealComponent.HasAnySeal) return;
+
+            // 봉인 활성 시 AI 위에 [봉인] 표시
             UnityEditor.Handles.color = Color.cyan;
             UnityEditor.Handles.Label(
-                transform.position + Vector3.up * 2f,
-                $"[{_settings?.enemyType}] {_currentState}  Dir:{_facingDirection}");
-#endif
+                transform.position + Vector3.up * 2.5f,
+                $"[AI봉인] {_sealComponent.SealCount}개");
         }
+#endif
     }
 }

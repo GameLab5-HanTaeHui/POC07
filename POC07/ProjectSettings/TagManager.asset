@@ -16,13 +16,13 @@ TagManager:
   - 
   - 
   - Player
-  - 
-  - 
+  - PlayerAttackHit
+  - SealProjectile
   - 
   - 
   - Enemy
-  - 
-  - 
+  - EnemyAttackHit
+  - EnemyLock
   - 
   - 
   - Ground

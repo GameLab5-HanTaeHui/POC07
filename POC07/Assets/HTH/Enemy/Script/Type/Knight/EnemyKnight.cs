@@ -1,47 +1,52 @@
 ﻿// ============================================================
-// EnemyKnight.cs  v1.1
-// 기사형 적 — EnemyBase 상속
+// EnemyKnight.cs  v1.2
+// 기사형 적 — Guard 봉인 연동
+//
+// [v1.2 변경 — Guard 봉인 체크 추가]
+//   TakeDamage() 의 정면/후면 판단 직전에
+//   Guard 봉인 활성 여부 체크.
+//
+//   [Guard 봉인 활성 시]
+//     방패 판정을 건너뜀 → 정면 공격도 EnemyBase.TakeDamage() 정상 처리.
+//     시각적으로 파란 방패 플래시 없음 → 방패가 내려간 상태.
+//     자물쇠 미해제 상태에도 적용 (방패 봉인 = 방패 불능).
+//
+//   [Guard 봉인 해제 후]
+//     자동으로 방패 판정 복귀.
+//     자물쇠 해제(_isLockUnlocked) 상태와는 독립.
+//
+//   [설계 의도]
+//     Guard 봉인이 방패를 "잠근다".
+//     기사는 방어 무기(방패)를 스스로 들 수 없는 상태.
+//     플레이어는 이 틈에 정면 공략 + 자물쇠 해제 가능.
 //
 // [v1.1 변경]
-//   KnightAI 참조 → EnemyAI 참조로 교체 (단일 AI 컴포넌트 통합).
-//
-// [역할]
-//   EnemyBase 를 상속하여 기사형 전용 피격 로직 구현.
-//   정면 방패: 정면 공격 시 본체 피격 무시.
-//   등 뒤 자물쇠: LockComponent 해제 후 본체 피격 정상 처리.
-//
-// [피격 판단 흐름]
-//   TakeDamage(info) 호출
-//     ├── 자물쇠 미해제 + 정면 공격 → 방패 막힘 (무시 + 파란 플래시)
-//     ├── 자물쇠 미해제 + 후면 공격 → LockComponent.TakeDamage
-//     └── 자물쇠 해제 후            → EnemyBase.TakeDamage (정상 피격)
-//
-// [정면/후면 판단]
-//   dot(EnemyAI.FacingDirection, DamageInfo.Direction) < 0 = 정면 공격
-//
-// [Hierarchy]
-//   Enemy_Knight
-//   ├── [EnemyKnight]
-//   ├── [EnemyAI]           enemyType = Knight
-//   ├── [KnightAttack]
-//   ├── [EnemySensor]
-//   ├── [Rigidbody2D]
-//   ├── [CapsuleCollider2D]
-//   ├── [SpriteRenderer]
-//   └── Lock_Back
-//         ├── [LockComponent]
-//         └── [BoxCollider2D] isTrigger=ON
+//   KnightAI 참조 → EnemyAI 참조로 교체.
 //
 // [네임스페이스]
 //   namespace : KEY
 // ============================================================
 
+using System.Collections;
 using UnityEngine;
 
 namespace KEY
 {
     /// <summary>
-    /// 기사형 적. EnemyBase 상속. (v1.1)
+    /// 기사형 적. EnemyBase 상속. (v1.2)
+    ///
+    /// ────────────────────────────────────────────────────
+    /// [TakeDamage 처리 흐름 — v1.2]
+    ///   자물쇠 해제 후
+    ///     → EnemyBase.TakeDamage() (정상 피격)
+    ///
+    ///   자물쇠 미해제
+    ///     → Guard 봉인 활성?
+    ///         Yes → 방패 무시 → EnemyBase.TakeDamage() (정면도 피격)
+    ///         No  → IsFrontalAttack() 체크
+    ///                 정면 → 방패 막힘 (파란 플래시)
+    ///                 후면 → 자물쇠 피격
+    /// ────────────────────────────────────────────────────
     /// </summary>
     public class EnemyKnight : EnemyBase
     {
@@ -62,10 +67,15 @@ namespace KEY
         // 컴포넌트 참조
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// EnemyAI 참조 — FacingDirection 읽기용.
-        /// </summary>
+        /// <summary> EnemyAI 참조 — FacingDirection 읽기용. </summary>
         private EnemyAI _enemyAI;
+
+        /// <summary>
+        /// 봉인 컴포넌트 참조.
+        /// Guard 봉인 체크에 사용.
+        /// Awake 에서 자동 취득. 없어도 동작.
+        /// </summary>
+        private EnemySealComponent _sealComponent;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -73,7 +83,8 @@ namespace KEY
 
         /// <summary>
         /// 자물쇠 해제 여부.
-        /// false = 방패/자물쇠 판단 / true = 정상 피격 처리.
+        /// false = 방패/자물쇠 판단 활성
+        /// true  = EnemyBase 정상 피격 처리
         /// </summary>
         private bool _isLockUnlocked;
 
@@ -86,6 +97,7 @@ namespace KEY
             base.Awake();
 
             _enemyAI = GetComponent<EnemyAI>();
+            _sealComponent = GetComponent<EnemySealComponent>();
 
             if (_backLock == null)
                 _backLock = GetComponentInChildren<LockComponent>();
@@ -117,18 +129,42 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 기사형 피격 처리.
-        /// 자물쇠 해제 전 → 정면/후면 판단.
-        /// 자물쇠 해제 후 → EnemyBase 정상 처리.
+        /// 기사형 피격 처리. (v1.2)
+        ///
+        /// [처리 분기]
+        ///   1. 자물쇠 해제 후
+        ///      → EnemyBase.TakeDamage() 정상 처리
+        ///
+        ///   2. 자물쇠 미해제 + Guard 봉인 활성
+        ///      → 방패 무시 → EnemyBase.TakeDamage() 정상 처리
+        ///      (정면 공격도 피격됨)
+        ///
+        ///   3. 자물쇠 미해제 + Guard 봉인 비활성
+        ///      → IsFrontalAttack() 판단
+        ///         정면 → 방패 막힘 + 파란 플래시
+        ///         후면 → 자물쇠 피격
         /// </summary>
         public new void TakeDamage(DamageInfo info)
         {
+            // ① 자물쇠 해제 후 → 정상 피격
             if (_isLockUnlocked)
             {
                 base.TakeDamage(info);
                 return;
             }
 
+            // ② Guard 봉인 활성 → 방패 무시하고 정상 피격
+            bool guardSealed = _sealComponent != null
+                && _sealComponent.IsSealedAction(SealType.Guard);
+
+            if (guardSealed)
+            {
+                Debug.Log("[EnemyKnight] Guard 봉인 활성 → 방패 무시 피격!");
+                base.TakeDamage(info);
+                return;
+            }
+
+            // ③ 방패 / 자물쇠 판단
             if (IsFrontalAttack(info.Direction))
             {
                 // 정면 → 방패 막힘
@@ -173,35 +209,33 @@ namespace KEY
 
         /// <summary>
         /// 공격 방향이 정면 공격인지 판단.
-        /// dot(기사 바라보는 방향, 공격 방향) &lt; 0 = 정면 공격.
+        ///
+        /// [판단 공식]
+        ///   dot(EnemyFacingDir, AttackDir) &lt; 0 = 정면 공격
+        ///   적이 오른쪽(1)을 보고 있고 공격 방향이 오른쪽(1)이면
+        ///   dot = 1 × 1 = 1 > 0 → 후면 공격.
+        ///   적이 오른쪽(1)을 보고 있고 공격 방향이 왼쪽(-1)이면
+        ///   dot = 1 × -1 = -1 &lt; 0 → 정면 공격.
         /// </summary>
-        private bool IsFrontalAttack(Vector2 attackDirection)
+        /// <param name="attackDir">공격 방향 벡터 (DamageInfo.Direction)</param>
+        /// <returns>정면 공격이면 true</returns>
+        private bool IsFrontalAttack(Vector2 attackDir)
         {
-            float facing = _enemyAI != null ? _enemyAI.FacingDirection : 1f;
-            return Vector2.Dot(new Vector2(facing, 0f), attackDirection) < 0f;
+            float facingDir = _enemyAI != null ? _enemyAI.FacingDirection : 0;// _facingDirection;
+            float dot = facingDir * attackDir.x;
+            return dot < 0f;
         }
 
         /// <summary>
-        /// 방패 막힘 플래시 (파란색 깜빡임).
+        /// 방패 막힘 파란 플래시 코루틴.
         /// </summary>
-        private System.Collections.IEnumerator ShieldFlashRoutine()
+        private IEnumerator ShieldFlashRoutine()
         {
-            _spriteRenderer.color = new Color(0.4f, 0.4f, 1f, 1f);
-            yield return new WaitForSeconds(0.1f);
-            _spriteRenderer.color = _isLockUnlocked
-                ? new Color(1f, 0.4f, 0.4f, 1f)
-                : Color.white;
-        }
+            if (_spriteRenderer == null) yield break;
 
-        // ══════════════════════════════════════════════════════
-        // Gizmos
-        // ══════════════════════════════════════════════════════
-
-        protected override void OnDrawGizmosSelected()
-        {
-            base.OnDrawGizmosSelected();
-            Gizmos.color = _isLockUnlocked ? Color.yellow : Color.blue;
-            Gizmos.DrawWireSphere(transform.position, 0.5f);
+            _spriteRenderer.color = new Color(0.3f, 0.5f, 1f, 1f);
+            yield return new WaitForSeconds(0.12f);
+            _spriteRenderer.color = Color.white;
         }
     }
 }

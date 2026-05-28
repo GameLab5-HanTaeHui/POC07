@@ -173,27 +173,9 @@ RustyKeyWeapon.OnCombo1Started
       → DOLocalMove(원점, Ease.InQuart)
 ```
 
-**KeyDataSO 스윙 기본값**
-```
-swingDistance    : 0.5
-swingDuration    : 0.08
-returnDuration   : 0.15
-airSwingDistance : 0.4
-```
-
 ---
 
 ### v0.7 — Animator 파라미터 개편 + PlayerMover 이벤트 추가
-
-**배경 — Player.controller 분석 결과**
-
-| 문제 | 내용 |
-|---|---|
-| Jump Trigger 미연결 | 파라미터 존재하나 어떤 전환에도 연결 안 됨 |
-| Fall 진입 조건 없음 | Jump ExitTime에만 의존, velocity 기반 조건 없음 |
-| Attack 조건 없음 | AnyState + 조건 없음 → 아무 때나 Attack01 진입 |
-| AttackCombo1/2/3 미존재 | Trigger 파라미터 자체가 없음 |
-| 공중 공격 스테이트 없음 | PlayerAirAttack 스테이트 미존재 |
 
 **완성 파일**
 
@@ -229,20 +211,7 @@ airSwingDistance : 0.4
 
 **Unity 에디터 작업 (Player.controller)**
 
-파라미터 추가
 ```
-VelocityY     (Float)
-Jump          (Trigger)
-AttackCombo1  (Trigger)
-AttackCombo2  (Trigger)
-AttackCombo3  (Trigger)
-AirAttack     (Trigger)
-```
-
-전환 수정
-```
-Idle/Move → PlayerJump      : Jump(Trigger) 조건으로 교체
-PlayerJump → PlayerFall     : VelocityY < -0.1 조건 추가
 AnyState → PlayerAttack01   : AttackCombo1(Trigger) + IsGrounded=true
 Attack01 → Attack02         : AttackCombo2(Trigger) + ExitTime 0.5
 Attack02 → Attack03         : AttackCombo3(Trigger) + ExitTime 0.5
@@ -251,10 +220,142 @@ AnyState → PlayerAirAttack  : AirAttack(Trigger) + IsGrounded=false
 PlayerAirAttack → PlayerFall: ExitTime 1.0
 ```
 
-신규 스테이트 추가
+---
+
+### v0.8 — 버그픽스 (대쉬 관통 / 무기 좌우 반전 / 콤보 Trigger 잔류)
+
+**완성 파일**
+
+| 파일 | 변경 내용 | 버전 |
+|---|---|---|
+| `PlayerMover.cs` | 대쉬 DOMove → MovePosition 코루틴 교체, OnFlipped 이벤트 추가 | v1.5 |
+| `PlayerWeaponMover.cs` | OnFlipped 구독, Weapon localPosition X 좌우 동기화 | v1.1 |
+| `MovementAnimator.cs` | ResetTrigger 클리어 추가 (미소비 Trigger 잔류 방지) | v2.1 |
+| `RustyKeyWeapon.cs` | Animator normalizedTime 직접 폴링, Trigger 선발행 버그 수정 | v1.3 |
+| `KeyDataSO.cs` | Animator 콤보 타이밍 필드 추가 | v1.2 |
+
+**버그 수정 내용**
+
+| 버그 | 원인 | 수정 |
+|---|---|---|
+| 대쉬 얇은 벽 관통 | DOMove 가 물리 무시 | MovePosition 코루틴 + CastCollider 벽 감지 |
+| 무기 왼쪽 방향 위치 오류 | _originLocalPosition X 고정 | OnFlipped 이벤트로 X 부호 반전 |
+| 클릭 없이 Attack02 전환 | elapsed 타이머 vs Animator 타이밍 불일치 | normalizedTime 직접 폴링 |
+| Trigger 큐 잔류 | SetTrigger 후 소비 안 된 채 남음 | ResetTrigger 일괄 클리어 |
+
+**Attack 클립 필수 설정**
 ```
-PlayerAirAttack — 공중 내리찍기 모션 (클립: 스프라이트 완성 후)
+PlayerAttack01/02/03.anim
+  Loop Time = OFF  (m_LoopTime: 0)
+  → Loop ON 상태면 normalizedTime >= 1.0 조건 미도달 → while 루프 무한 지속
 ```
+
+---
+
+### v0.9 — 입력 2단 방지 (프레임 방어 코드)
+
+**완성 파일**
+
+| 파일 | 변경 내용 | 버전 |
+|---|---|---|
+| `RustyKeyWeapon.cs` | `_lastAttackInputFrame` 프레임 방어 추가, ComboReset 에서 초기화 | v1.4 |
+
+**구조**
+```csharp
+// 같은 프레임 중복 입력 차단
+if (_lastAttackInputFrame == Time.frameCount) return;
+_lastAttackInputFrame = Time.frameCount;
+
+// ComboReset 에서 초기화 (리셋 직후 입력 씹힘 방지)
+_lastAttackInputFrame = -1;
+```
+
+---
+
+### v0.10 — 봉인 열쇠 시스템 (SealKey)
+
+**컨셉**
+플레이어가 적에게 자물쇠를 "걸어" 특정 행동을 봉인하는 시스템.
+기존 열쇠(해제 방향)와 반대 방향의 쌍방향 자물쇠 구조 완성.
+
+**완성 파일**
+
+| 파일 | 역할 | 버전 |
+|---|---|---|
+| `SealType.cs` | 봉인 타입 enum (6종) | v1.0 |
+| `KeyType.cs` | Seal 항목 추가 | v1.1 |
+| `SealDataSO.cs` | 봉인 수치 ScriptableObject | v1.0 |
+| `EnemySealComponent.cs` | 적 봉인 상태 관리 | v1.0 |
+| `SealProjectile.cs` | 봉인 투사체 | v1.0 |
+| `SealKeyWeapon.cs` | 봉인 열쇠 무기 구현체 | v1.0 |
+| `PlayerWeaponBase.cs` | IsReadyToFire 가상 프로퍼티 추가 | v1.2 |
+| `PlayerWeaponController.cs` | SealKeyWeapon 분기 + WeaponEntry.sealData 추가 | v1.4 |
+| `EnemyAI.cs` | EnemySealComponent 연동, 봉인 행동 차단 체크 | v3.0 |
+| `EnemyKnight.cs` | Guard 봉인 체크, 방패 무시 피격 처리 | v1.2 |
+
+**봉인 타입 6종**
+
+| 타입 | 차단 행동 | 주요 대상 |
+|---|---|---|
+| `Dash` | 돌진 / 급이동 | 기사형, 드론형 |
+| `Jump` | 점프 / 상승 | 드론형 |
+| `Ranged` | 원거리 투사체 | 궁수형 |
+| `Guard` | 방어 / 가드 → 정면 피격 허용 | 기사형 방패 |
+| `Move` | 이동 전체 | 모든 적 (강력 — 지속시간 짧게) |
+| `Attack` | 모든 공격 | 모든 적 |
+
+**봉인 적용 흐름**
+```
+InputManager.OnAttack
+  → SealKeyWeapon.FireProjectile()
+      → Instantiate(SealProjectile)
+      → SealProjectile.Launch(sealData, facingDir)
+          → 직진 이동
+          → OnTriggerEnter2D (Enemy 레이어)
+              → EnemySealComponent.ApplySeal(sealData)
+                  → _activeSeals[SealType] = duration 등록
+                  → SealFlashRoutine 시작 (깜빡임)
+```
+
+**EnemyAI 봉인 체크 위치**
+
+| 함수 | 체크 봉인 | 봉인 시 동작 |
+|---|---|---|
+| `OnPatrolMove()` | Move / Dash | StopHorizontal() |
+| `OnChaseMove()` | Move | StopHorizontal() |
+| `OnEnterAttack()` | Attack | ChangeState(Chase) |
+
+**EnemyKnight Guard 봉인 흐름**
+```
+TakeDamage(info)
+  → 자물쇠 해제됨?    → EnemyBase.TakeDamage()
+  → Guard 봉인 활성?  → 방패 무시 → EnemyBase.TakeDamage()
+  → 정면 공격?        → 방패 막힘 플래시
+  → 후면 공격?        → 자물쇠 피격
+```
+
+**PlayerWeaponBase.IsReadyToFire**
+```csharp
+// 기본값 (일반 열쇠)
+protected virtual bool IsReadyToFire => _keyData != null;
+
+// SealKeyWeapon override
+protected override bool IsReadyToFire => _sealData != null;
+```
+
+**EnemySealComponent 중복 봉인 규칙**
+- 같은 SealType 재명중 → 타이머 리셋 (스택 없음)
+- 다른 SealType → maxSealCount 까지 동시 적용
+- 초과 시 가장 오래된 봉인 제거 후 추가
+
+**SealData 에셋 권장 기본값**
+
+| 에셋 | sealType | sealDuration | 비고 |
+|---|---|---|---|
+| `SealData_Dash.asset` | Dash | 4.0 | 기본 봉인 |
+| `SealData_Guard.asset` | Guard | 3.5 | 방패 내림 |
+| `SealData_Move.asset` | Move | 1.5 | 전체 정지 — 짧게 |
+| `SealData_Attack.asset` | Attack | 2.5 | 공격 차단 |
 
 ---
 
@@ -263,10 +364,13 @@ PlayerAirAttack — 공중 내리찍기 모션 (클립: 스프라이트 완성 �
 | 항목 | 상태 | 메모 |
 |---|---|---|
 | Player.controller 에디터 수정 | 🔲 미착수 | v0.7 가이드 참고 |
+| Attack 클립 Loop Time OFF | 🔲 필수 | PlayerAttack01/02/03.anim |
 | 스프라이트 / 애니메이션 클립 | 🔲 미착수 | 완성 후 클립 연결 |
 | AnimatorOverrideController 세팅 | 🔲 보류 | 스프라이트 완성 후 |
+| SealProjectile Prefab 생성 | 🔲 미착수 | Hierarchy 가이드 참고 |
+| EnemySealComponent 적 부착 | 🔲 미착수 | Enemy_Knight 에 우선 부착 |
+| SealData 에셋 생성 | 🔲 미착수 | Assets/KEY/DataSO/Seals/ |
 | 자물쇠 해제 조건 다양화 | 🔲 미착수 | LockComponent 확장 필요 |
-| KeyType enum 4종 추가 | 🔲 미착수 | 봉인/반전/연쇄/귀환 열쇠 |
-| 테스트 씬 구성 | 🔲 미착수 | 더미 적 + 플레이어 전투 확인 |
+| 테스트 씬 구성 | 🔲 미착수 | 봉인 시스템 포함 전투 테스트 |
 | GameManager | 🔲 미착수 | 씬 전역 관리 |
 | CinemachineCamera | 🔲 미착수 | 플레이어 추적 카메라 |
