@@ -46,6 +46,10 @@ namespace KEY
         // Inspector
         // ──────────────────────────────────────────
 
+        [Header("── 스프라이트 ──────────────────────")]
+        [Tooltip("자물쇠 시각 표현용 SpriteRenderer.")]
+        [SerializeField] private SpriteRenderer _spriteRenderer;
+
         [Header("── 해제 조건 ──────────────────────")]
 
         /// <summary>
@@ -82,9 +86,6 @@ namespace KEY
 
         /// <summary> 이 자물쇠가 부착된 Collider2D. </summary>
         private Collider2D _collider;
-
-        /// <summary> 자물쇠 시각 표현용 SpriteRenderer. </summary>
-        private SpriteRenderer _spriteRenderer;
 
         // ──────────────────────────────────────────
         // 이벤트

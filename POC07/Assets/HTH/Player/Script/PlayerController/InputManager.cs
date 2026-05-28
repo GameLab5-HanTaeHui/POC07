@@ -1,24 +1,28 @@
 ﻿// ============================================================
-// InputManager.cs  v1.0
+// InputManager.cs  v2.4
 // 플레이어 입력 통합 관리 컴포넌트
 //
-// [역할]
-//   플레이어가 사용하는 모든 키 입력을 하나의 컴포넌트에서 관리.
-//   기존 MovementInput(이동/점프/대쉬) + WeaponInput(공격) 병합.
-//   New Input System 을 직접 구독하여 이벤트로 각 시스템에 전달.
+// [v2.2 변경 — KeySwap 중 이동 허용]
+//   이동 / 점프 / 대쉬는 KeySwap 모드 중에도 항상 작동.
+//   공격만 KeySwap 모드 시 슬롯 8번으로 전환.
 //
-// [구독 대상]
-//   PlayerMover        : OnMove / OnJump / OnDash
-//   PlayerWeaponBase   : OnAttack / OnAirAttack (공중 여부는 외부에서 판별)
-//
-// [점프 차단 API]
-//   외부(인벤토리 UI 등)에서 점프를 막아야 할 때:
-//     InputManager.Instance.BlockJump();
-//     InputManager.Instance.UnblockJump();
+// [ActionMap 구조]
+//   _inGameMap  : Move / Jump / Dash / Attack
+//   _keySwapMap : SwapMode / Slot0~15
+//   두 맵 동시 Enable.
+//   이동 이벤트 차단 제거 — _isKeySwapMode 관계없이 항상 발행.
+//   공격만 분기 유지.
 //
 // [키 바인딩]
-//   Inspector 에서 변경 가능한 구조.
-//   InputActionAsset 에셋 없이 코드 직접 바인딩 방식으로 동작.
+//   이동 : ← →     (항상)
+//   점프 : Space    (항상)
+//   대쉬 : LShift   (항상)
+//   공격 : A        (KeySwap OFF 시) / 슬롯 8 (KeySwap ON 시)
+//   KeySwap 모드 : LCtrl 누름 유지
+//   슬롯 0~3  : 1 2 3 4
+//   슬롯 4~7  : Q W E R
+//   슬롯 8~11 : A S D F
+//   슬롯 12~15: Z X C V
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -31,18 +35,14 @@ using UnityEngine.InputSystem;
 namespace KEY
 {
     /// <summary>
-    /// 플레이어 입력 통합 관리 컴포넌트. (v1.0)
+    /// 플레이어 입력 통합 관리 컴포넌트. (v2.4)
     ///
     /// ────────────────────────────────────────────────────
-    /// [이 파일이 하는 것]
-    ///   - 이동 / 점프 / 대쉬 / 공격 입력을 단일 컴포넌트에서 수신
-    ///   - 각 입력을 이벤트(Action)로 발행하여 관련 시스템에 전달
-    ///   - 점프 차단(BlockJump) API 제공
-    ///
-    /// [이 파일이 하지 않는 것]
-    ///   - 물리 이동 처리 (PlayerMover 담당)
-    ///   - 무기 공격 처리 (PlayerWeaponBase 담당)
-    ///   - 공중/지상 판별 (PlayerMover.IsGrounded 를 외부에서 참조)
+    /// [KeySwap 모드 동작]
+    ///   이동 / 점프 / 대쉬 : 모드 무관 항상 작동
+    ///   공격(A)            : 모드 OFF → OnAttack
+    ///                        모드 ON  → OnKeySwap(8)
+    ///   슬롯 키            : 모드 ON 시에만 OnKeySwap(index) 발행
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class InputManager : MonoBehaviour
@@ -51,252 +51,431 @@ namespace KEY
         // 싱글턴
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 전역 단일 인스턴스.
-        /// 씬 전환 시 Player 가 파괴되면 null 로 초기화됨.
-        /// DontDestroyOnLoad 사용 금지 — 씬마다 새로 생성.
-        /// </summary>
         public static InputManager Instance { get; private set; }
 
         // ──────────────────────────────────────────
-        // Inspector — 이동 키 바인딩
+        // Inspector — InGame 키 바인딩
         // ──────────────────────────────────────────
 
-        [Header("── 이동 키 바인딩 ──────────────────────")]
+        [Header("── InGame 키 바인딩 ──────────────────────")]
 
-        /// <summary> 오른쪽 이동 키. 기본 D키. </summary>
-        [Tooltip("오른쪽 이동 키. 기본: <Keyboard>/d")]
-        protected private string _keyMoveRight = "<Keyboard>/d";
+        [Tooltip("오른쪽 이동 키.")]
+        [SerializeField] private Key _keyMoveRight = Key.RightArrow;
 
-        /// <summary> 왼쪽 이동 키. 기본 A키. </summary>
-        [Tooltip("왼쪽 이동 키. 기본: <Keyboard>/a")]
-        protected private string _keyMoveLeft = "<Keyboard>/a";
+        [Tooltip("왼쪽 이동 키.")]
+        [SerializeField] private Key _keyMoveLeft = Key.LeftArrow;
 
-        /// <summary> 오른쪽 화살표 보조 이동. </summary>
-        [Tooltip("오른쪽 화살표 보조 이동.")]
-        protected private string _keyMoveRightAlt = "<Keyboard>/rightArrow";
+        [Tooltip("점프 키.")]
+        [SerializeField] private Key _keyJump = Key.Space;
 
-        /// <summary> 왼쪽 화살표 보조 이동. </summary>
-        [Tooltip("왼쪽 화살표 보조 이동.")]
-        protected private string _keyMoveLeftAlt = "<Keyboard>/leftArrow";
-
-        /// <summary> 점프 키. 기본 Space. </summary>
-        [Tooltip("점프 키. 기본: <Keyboard>/space")]
-        protected private string _keyJump = "<Keyboard>/space";
-
-        /// <summary> 대쉬 키. 기본 LShift. </summary>
-        [Tooltip("대쉬 키. 기본: <Keyboard>/leftShift")]
-        protected private string _keyDash = "<Keyboard>/leftShift";
-
-        // ──────────────────────────────────────────
-        // Inspector — 무기 키 바인딩
-        // ──────────────────────────────────────────
-
-        [Header("── 무기 키 바인딩 ──────────────────────")]
+        [Tooltip("대쉬 키.")]
+        [SerializeField] private Key _keyDash = Key.LeftShift;
 
         /// <summary>
-        /// 공격 키. 기본 마우스 좌클릭.
-        /// 지상/공중 여부는 PlayerMover.IsGrounded 로 판별.
+        /// 공격 키. 기본 A.
+        /// KeySwap 모드 ON → 슬롯 8번으로 전환.
+        /// _keySwapSlots[8] 과 동일한 키여야 함.
         /// </summary>
-        [Tooltip("공격 키. 기본: <Mouse>/leftButton")]
-        protected private string _keyAttack = "<Mouse>/leftButton";
+        [Tooltip("공격 키. KeySwap 모드 시 슬롯 8번으로 전환.")]
+        [SerializeField] private Key _keyAttack = Key.A;
 
         // ──────────────────────────────────────────
-        // 내부 — InputAction
+        // Inspector — KeySwap 키 바인딩
         // ──────────────────────────────────────────
 
-        private InputActionMap _actionMap;
+        [Header("── KeySwap 키 바인딩 ──────────────────────")]
 
-        /// <summary> 수평 이동 입력 Action. 1DAxis Composite (float 반환). </summary>
+        [Tooltip("KeySwap 모드 키 (누름 유지).")]
+        [SerializeField] private Key _keySwapMode = Key.LeftCtrl;
+
+        /// <summary>
+        /// 슬롯 키 16개. 순서: 1234 / QWER / ASDF / ZXCV
+        /// 슬롯 8 (A) 은 공격키와 겸용 — InGame Attack 콜백에서 분기 처리.
+        /// </summary>
+        [Tooltip("KeySwap 슬롯 키 16개. 순서: 1234 / QWER / ASDF / ZXCV")]
+        [SerializeField]
+        private Key[] _keySwapSlots = new Key[]
+        {
+            Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4,
+            Key.Q,      Key.W,      Key.E,      Key.R,
+            Key.A,      Key.S,      Key.D,      Key.F,   // 슬롯 8=A 겸용
+            Key.Z,      Key.X,      Key.C,      Key.V,
+        };
+
+
+        [Header("── 차징 공격 키 바인딩 ──────────────────────")]
+
+        /// <summary>
+        /// 차징 공격 키. 기본 S.
+        /// 누름 유지 → 차징 시작 / 뗌 → 발사 (최소 차징 충족 시).
+        /// KeySwap 슬롯 9번(S)과 겸용이므로 KeySwap 모드 중 차징 불가.
+        /// </summary>
+        [Tooltip("차징 공격 키. 기본: S (누름 → 차징 / 뗌 → 발사)")]
+        [SerializeField] private Key _keyCharge = Key.S;
+
+        /// <summary> 차징 조준 위. 기본 ↑. </summary>
+        [Tooltip("차징 조준 위. 기본: ↑")]
+        [SerializeField] private Key _keyAimUp = Key.UpArrow;
+
+        /// <summary> 차징 조준 아래. 기본 ↓. </summary>
+        [Tooltip("차징 조준 아래. 기본: ↓")]
+        [SerializeField] private Key _keyAimDown = Key.DownArrow;
+
+        // ──────────────────────────────────────────
+        // InputAction — 단일 인스턴스 유지
+        // ──────────────────────────────────────────
+
+        private InputActionMap _inGameMap;
+        private InputActionMap _keySwapMap;
+
+        // InGame
         private InputAction _actionMove;
-
-        /// <summary> 점프 버튼 Action. </summary>
         private InputAction _actionJump;
-
-        /// <summary> 대쉬 버튼 Action. </summary>
         private InputAction _actionDash;
-
-        /// <summary> 공격 버튼 Action. </summary>
         private InputAction _actionAttack;
+
+        // Charge
+        private InputAction _actionCharge;
+        private InputAction _actionAimUp;
+        private InputAction _actionAimDown;
+
+        // KeySwap
+        private InputAction _actionSwapMode;
+        private InputAction[] _actionSwapSlots;
 
         // ──────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 점프 차단 플래그.
-        /// true 이면 OnJump 이벤트를 발행하지 않는다.
-        /// BlockJump() / UnblockJump() 로 제어.
-        /// </summary>
         private bool _jumpBlocked;
+        private bool _moveBlocked;
+        private bool _dashBlocked;
+        private bool _isKeySwapMode;
 
         // ──────────────────────────────────────────
-        // 이벤트 — 이동 (PlayerMover 구독)
+        // 이벤트 — InGame (항상 발행)
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 수평 이동 입력값 변경 시 발행.
-        /// float: -1(왼쪽) ~ 1(오른쪽). 0 = 입력 없음.
-        /// </summary>
+        /// <summary> 수평 이동 입력. KeySwap 모드 중에도 발행. </summary>
         public event Action<float> OnMove;
 
-        /// <summary>
-        /// 점프 버튼 pressed 시 발행.
-        /// _jumpBlocked == true 이면 발행하지 않음.
-        /// </summary>
+        /// <summary> 점프. _jumpBlocked 시 차단. KeySwap 모드 중에도 발행. </summary>
         public event Action OnJump;
 
-        /// <summary>
-        /// 대쉬 버튼 pressed 시 발행.
-        /// </summary>
+        /// <summary> 대쉬. KeySwap 모드 중에도 발행. </summary>
         public event Action OnDash;
 
-        // ──────────────────────────────────────────
-        // 이벤트 — 무기 (PlayerWeaponBase 구독)
-        // ──────────────────────────────────────────
-
         /// <summary>
-        /// 공격 버튼 pressed 시 발행.
-        /// 지상/공중 판별은 구독 측(PlayerWeaponBase)에서
-        /// PlayerMovementFacade.Instance.IsGrounded 로 수행.
+        /// 공격. KeySwap 모드 OFF 시에만 발행.
+        /// KeySwap ON 시 A 키는 OnKeySwap(8) 으로 전환.
         /// </summary>
         public event Action OnAttack;
 
-        // ══════════════════════════════════════════════════════
-        // Unity 라이프사이클
-        // ══════════════════════════════════════════════════════
+        // ──────────────────────────────────────────
+        // 이벤트 — KeySwap
+        // ──────────────────────────────────────────
 
         /// <summary>
-        /// 싱글턴 설정 + InputAction 빌드 및 활성화.
+        /// KeySwap 모드 전환 시 발행.
+        /// true = 진입 / false = 해제.
         /// </summary>
-        private void Awake()
-        {
-            // ── 싱글턴 보장 ──────────────────────
-            // Destroy(gameObject) 가 아닌 Destroy(this) 로 컴포넌트만 제거.
-            if (Instance != null && Instance != this)
-            {
-                Destroy(this);
-                return;
-            }
-            Instance = this;
-
-            BuildActions();
-            SubscribeActions();
-            _actionMap.Enable();
-        }
+        public event Action<bool> OnKeySwapModeChanged;
 
         /// <summary>
-        /// 구독 해제 및 InputActionMap 정리.
+        /// KeySwap 모드 중 슬롯 키 입력 시 발행.
+        /// 파라미터: 슬롯 인덱스 (0~15).
         /// </summary>
-        private void OnDestroy()
-        {
-            if (Instance == this) Instance = null;
+        public event Action<int> OnKeySwap;
 
-            UnsubscribeActions();
-            _actionMap?.Disable();
-            _actionMap?.Dispose();
-        }
-
-        // ══════════════════════════════════════════════════════
-        // 외부 API — 점프 차단
-        // ══════════════════════════════════════════════════════
+        // ──────────────────────────────────────────
+        // 프로퍼티
+        // ──────────────────────────────────────────
 
         /// <summary>
-        /// 점프 입력을 차단한다.
-        ///
-        /// [사용 예시]
-        ///   인벤토리 열릴 때:
-        ///     InputManager.Instance.BlockJump();
-        ///   인벤토리 닫힐 때:
-        ///     InputManager.Instance.UnblockJump();
+        /// 차징 시작 (S 누름).
+        /// PlayerChargeAttack 이 구독하여 차징 로직 시작.
+        /// KeySwap 모드 중에는 발행하지 않음.
         /// </summary>
-        public void BlockJump() => _jumpBlocked = true;
+        public event Action OnChargeStart;
 
         /// <summary>
-        /// 점프 차단을 해제한다.
+        /// 차징 해제 (S 뗌).
+        /// PlayerChargeAttack 이 구독하여 발사 or 취소 판단.
         /// </summary>
-        public void UnblockJump() => _jumpBlocked = false;
+        public event Action OnChargeRelease;
+
+        /// <summary>
+        /// 차징 중 좌우 방향키 입력 시 발행.
+        /// 파라미터: +1 = 오른쪽 / -1 = 왼쪽.
+        /// PlayerChargeAttack 이 구독하여 FacingDirection 갱신.
+        /// 차징 중이 아닐 때는 PlayerChargeAttack 내부에서 무시.
+        /// </summary>
+        public event Action<float> OnChargeFlip;
+
+        /// <summary>
+        /// 조준 방향 입력 상태.
+        /// 파라미터: +1.0 = 위 누름 / -1.0 = 아래 누름 / 0.0 = 뗌.
+        /// PlayerChargeAttack 이 매 프레임 값을 읽어 부드럽게 각도 변경.
+        /// </summary>
+        public event Action<float> OnAimAdjust;
+
+        // ──────────────────────────────────────────
+        // 프로퍼티
+        // ──────────────────────────────────────────
+
+        /// <summary> 현재 KeySwap 모드 여부. </summary>
+        public bool IsKeySwapMode => _isKeySwapMode;
 
         /// <summary> 현재 점프 차단 여부. </summary>
         public bool IsJumpBlocked => _jumpBlocked;
 
         // ══════════════════════════════════════════════════════
-        // InputAction 빌드 — 내부
+        // Unity 라이프사이클
+        // ══════════════════════════════════════════════════════
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this) { Destroy(this); return; }
+            Instance = this;
+
+            BuildInGameMap();
+            BuildKeySwapMap();
+
+            // 두 맵 동시 Enable
+            _inGameMap.Enable();
+            _keySwapMap.Enable();
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+
+            _inGameMap?.Disable();
+            _inGameMap?.Dispose();
+            _keySwapMap?.Disable();
+            _keySwapMap?.Dispose();
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 외부 API
+        // ══════════════════════════════════════════════════════
+
+        /// <summary> 점프 차단. </summary>
+        public void BlockJump() => _jumpBlocked = true;
+
+        /// <summary> 점프 차단 해제. </summary>
+        public void UnblockJump() => _jumpBlocked = false;
+
+        /// <summary> 이동 차단. 차징 중 호출. </summary>
+        public void BlockMove() => _moveBlocked = true;
+
+        /// <summary> 이동 차단 해제. </summary>
+        public void UnblockMove() => _moveBlocked = false;
+
+        /// <summary> 대쉬 차단. 차징 중 호출. </summary>
+        public void BlockDash() => _dashBlocked = true;
+
+        /// <summary> 대쉬 차단 해제. </summary>
+        public void UnblockDash() => _dashBlocked = false;
+
+        // ══════════════════════════════════════════════════════
+        // Key enum → Input System 경로 변환
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// InputActionMap 을 코드로 직접 생성.
-        /// Inspector 의 키 바인딩 문자열을 사용하여 동적으로 구성.
+        /// Key enum 을 Input System 바인딩 경로 문자열로 변환.
         ///
-        /// [1DAxis Composite 주의]
-        ///   1DAxis 는 float 을 반환한다.
-        ///   반드시 ReadValue&lt;float&gt;() 로 읽어야 한다.
+        /// [1차] Keyboard.current 컨트롤 순회 → keyCode 일치 경로 반환
+        /// [2차] 폴백 — Digit1~4 → "1"~"4", 나머지 camelCase 변환
         /// </summary>
-        private void BuildActions()
+        private static string KeyToPath(Key key)
         {
-            _actionMap = new InputActionMap("PlayerInput");
+            if (Keyboard.current != null)
+            {
+                foreach (var control in Keyboard.current.allControls)
+                {
+                    if (control is UnityEngine.InputSystem.Controls.KeyControl kc
+                        && kc.keyCode == key)
+                        return control.path;
+                }
+            }
 
-            // ── 이동 — 1DAxis Composite (float 반환) ──────────────────────
-            _actionMove = _actionMap.AddAction("Move", InputActionType.Value);
+            string name = key.ToString();
+            if (name.StartsWith("Digit"))
+                name = name.Substring(5);
+
+            return $"<Keyboard>/{char.ToLower(name[0]) + name.Substring(1)}";
+        }
+
+        // ══════════════════════════════════════════════════════
+        // InGame ActionMap 빌드
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// InGame ActionMap 생성.
+        /// 이동 / 점프 / 대쉬 / 공격 모두 여기서 Action 생성.
+        /// KeySwap 모드 중에도 이동 / 점프 / 대쉬는 차단하지 않음.
+        /// 공격(A)만 _isKeySwapMode 분기로 슬롯 8번 전환.
+        /// </summary>
+        private void BuildInGameMap()
+        {
+            _inGameMap = new InputActionMap("InGame");
+
+            // ── 이동 ──────────────────────
+            _actionMove = _inGameMap.AddAction("Move", InputActionType.Value);
             _actionMove.AddCompositeBinding("1DAxis")
-                .With("Negative", _keyMoveLeft)
-                .With("Positive", _keyMoveRight);
-            _actionMove.AddCompositeBinding("1DAxis")
-                .With("Negative", _keyMoveLeftAlt)
-                .With("Positive", _keyMoveRightAlt);
+                .With("Negative", KeyToPath(_keyMoveLeft))
+                .With("Positive", KeyToPath(_keyMoveRight));
             _actionMove.AddBinding("<Gamepad>/leftStick/x");
 
             // ── 점프 ──────────────────────
-            _actionJump = _actionMap.AddAction("Jump", InputActionType.Button);
-            _actionJump.AddBinding(_keyJump);
+            _actionJump = _inGameMap.AddAction("Jump", InputActionType.Button);
+            _actionJump.AddBinding(KeyToPath(_keyJump));
             _actionJump.AddBinding("<Gamepad>/buttonSouth");
 
             // ── 대쉬 ──────────────────────
-            _actionDash = _actionMap.AddAction("Dash", InputActionType.Button);
-            _actionDash.AddBinding(_keyDash);
+            _actionDash = _inGameMap.AddAction("Dash", InputActionType.Button);
+            _actionDash.AddBinding(KeyToPath(_keyDash));
             _actionDash.AddBinding("<Gamepad>/buttonEast");
 
             // ── 공격 ──────────────────────
-            _actionAttack = _actionMap.AddAction("Attack", InputActionType.Button);
-            _actionAttack.AddBinding(_keyAttack);
+            _actionAttack = _inGameMap.AddAction("Attack", InputActionType.Button);
+            _actionAttack.AddBinding(KeyToPath(_keyAttack));
             _actionAttack.AddBinding("<Gamepad>/buttonWest");
-        }
 
-        /// <summary>
-        /// 이벤트 콜백 등록.
-        ///
-        /// [Move — ReadValue&lt;float&gt;() 사용 이유]
-        ///   1DAxis Composite 은 float 을 반환한다.
-        ///   ReadValue&lt;Vector2&gt;() 로 읽으면 InvalidOperationException 발생.
-        /// </summary>
-        private void SubscribeActions()
-        {
-            _actionMove.performed += ctx => OnMove?.Invoke(ctx.ReadValue<float>());
-            _actionMove.canceled += _ => OnMove?.Invoke(0f);
+            // ── 콜백 ──────────────────────
+
+            // 이동 — _moveBlocked 시 차단
+            // 차징 중이어도 OnChargeFlip 은 항상 발행 (방향 전환용)
+            _actionMove.performed += ctx =>
+            {
+                float value = ctx.ReadValue<float>();
+                if (!_moveBlocked) OnMove?.Invoke(value);
+
+                // 차징 중 좌우 입력 → 방향 전환 이벤트 발행
+                if (value != 0f) OnChargeFlip?.Invoke(value > 0f ? 1f : -1f);
+            };
+            _actionMove.canceled += _ => OnMove?.Invoke(0f); // 뗌은 항상 0 발행 (멈춤 보장)
+
+            // 점프 — 항상 발행 (_jumpBlocked 는 HandleJump 내부에서 처리)
             _actionJump.performed += _ => HandleJump();
-            _actionDash.performed += _ => OnDash?.Invoke();
-            _actionAttack.performed += _ => OnAttack?.Invoke();
+
+            // 대쉬 — _dashBlocked 시 차단
+            _actionDash.performed += _ =>
+            {
+                if (!_dashBlocked) OnDash?.Invoke();
+            };
+
+            // 공격 — KeySwap 모드 시 슬롯 8번 전환
+            _actionAttack.performed += _ =>
+            {
+                if (_isKeySwapMode) OnKeySwap?.Invoke(8);
+                else OnAttack?.Invoke();
+            };
+
+            // ── 차징 ──────────────────────
+            _actionCharge = _inGameMap.AddAction("Charge", InputActionType.Button);
+            _actionCharge.AddBinding(KeyToPath(_keyCharge));
+
+            // AimUp / AimDown — Value 타입 (누름=1.0, 뗌=0.0 전달)
+            // PlayerChargeAttack 이 매 프레임 값을 읽어 부드럽게 각도 조절
+            _actionAimUp = _inGameMap.AddAction("AimUp", InputActionType.Value);
+            _actionAimUp.AddBinding(KeyToPath(_keyAimUp));
+
+            _actionAimDown = _inGameMap.AddAction("AimDown", InputActionType.Value);
+            _actionAimDown.AddBinding(KeyToPath(_keyAimDown));
+
+            _actionCharge.performed += _ =>
+            {
+                if (!_isKeySwapMode) OnChargeStart?.Invoke();
+            };
+            _actionCharge.canceled += _ =>
+            {
+                if (!_isKeySwapMode) OnChargeRelease?.Invoke();
+            };
+
+            // 누름(+1) / 뗌(0) 모두 발행 — PlayerChargeAttack 이 상태 유지
+            _actionAimUp.performed += _ => OnAimAdjust?.Invoke(+1f);
+            _actionAimUp.canceled += _ => OnAimAdjust?.Invoke(0f);
+            _actionAimDown.performed += _ => OnAimAdjust?.Invoke(-1f);
+            _actionAimDown.canceled += _ => OnAimAdjust?.Invoke(0f);
         }
 
-        /// <summary>
-        /// 이벤트 콜백 해제.
-        /// 람다를 변수로 저장하지 않는 간이 해제 방식 — Dispose 로 최종 정리.
-        /// </summary>
-        private void UnsubscribeActions()
-        {
-            _actionMove?.Disable();
-            _actionJump?.Disable();
-            _actionDash?.Disable();
-            _actionAttack?.Disable();
-        }
+        // ══════════════════════════════════════════════════════
+        // KeySwap ActionMap 빌드
+        // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 점프 입력 처리. _jumpBlocked 체크 후 OnJump 발행.
+        /// KeySwap ActionMap 생성.
+        /// SwapMode 토글 + 슬롯 15개 (슬롯 8=A 제외).
+        /// 이동 / 점프 / 대쉬는 InGame ActionMap 에서 단일 관리.
+        /// 별도 추가 없음 — 이중 등록 / 이중 발행 방지.
         /// </summary>
-        private void HandleJump()
+        private void BuildKeySwapMap()
+{
+    _keySwapMap = new InputActionMap("KeySwap");
+
+    // ── SwapMode 토글 ──────────────────────
+    _actionSwapMode = _keySwapMap.AddAction("SwapMode", InputActionType.Button);
+    _actionSwapMode.AddBinding(KeyToPath(_keySwapMode));
+
+    _actionSwapMode.performed += _ => EnterKeySwapMode();
+    _actionSwapMode.canceled += _ => ExitKeySwapMode();
+
+    // ── 슬롯 15개 (슬롯 8=A 제외) ──────────────────────
+    // 슬롯 8 (A 키) 는 _actionAttack 콜백에서 분기 처리.
+    // 여기서 중복 등록하면 KeySwap ON 시 이중 발행 발생.
+    _actionSwapSlots = new InputAction[_keySwapSlots.Length];
+
+    for (int i = 0; i < _keySwapSlots.Length; i++)
+    {
+        if (i == 8) { _actionSwapSlots[i] = null; continue; }
+
+        int capturedIndex = i;
+        var action = _keySwapMap.AddAction($"Slot{i}", InputActionType.Button);
+        action.AddBinding(KeyToPath(_keySwapSlots[i]));
+        action.performed += _ =>
         {
-            if (_jumpBlocked) return;
-            OnJump?.Invoke();
-        }
+            if (_isKeySwapMode) OnKeySwap?.Invoke(capturedIndex);
+        };
+
+        _actionSwapSlots[i] = action;
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// KeySwap 모드 전환
+// ══════════════════════════════════════════════════════
+
+/// <summary>
+/// KeySwap 모드 진입.
+/// 이동은 계속 허용. 공격만 슬롯 교체로 전환.
+/// </summary>
+private void EnterKeySwapMode()
+{
+    if (_isKeySwapMode) return;
+    _isKeySwapMode = true;
+    OnKeySwapModeChanged?.Invoke(true);
+}
+
+/// <summary>
+/// KeySwap 모드 해제.
+/// </summary>
+private void ExitKeySwapMode()
+{
+    if (!_isKeySwapMode) return;
+    _isKeySwapMode = false;
+    OnKeySwapModeChanged?.Invoke(false);
+}
+
+// ══════════════════════════════════════════════════════
+// 내부 핸들러
+// ══════════════════════════════════════════════════════
+
+private void HandleJump()
+{
+    if (_jumpBlocked) return;
+    OnJump?.Invoke();
+}
     }
 }
