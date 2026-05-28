@@ -167,9 +167,13 @@ namespace KEY
             if (_chargeAttack != null)
                 _chargeAttack.SetData(_settings);
 
-            // 공격 완료 이벤트 구독
+            // 근접 공격 완료 이벤트 구독
             if (_attack != null)
                 _attack.OnAttackFinished += HandleAttackFinished;
+
+            // 차징 공격 완료 이벤트 구독 (없으면 돌진 후 AI 멈춤)
+            if (_chargeAttack != null)
+                _chargeAttack.OnAttackFinished += HandleAttackFinished;
 
             // Dummy 타입은 AI 비활성
             if (_settings.enemyType == EnemyType.Dummy ||
@@ -183,6 +187,8 @@ namespace KEY
         {
             if (_attack != null)
                 _attack.OnAttackFinished -= HandleAttackFinished;
+            if (_chargeAttack != null)
+                _chargeAttack.OnAttackFinished -= HandleAttackFinished;
         }
 
         private void Update() => UpdateState();
@@ -419,6 +425,19 @@ namespace KEY
             if (_spriteRenderer != null)
                 _spriteRenderer.flipX = _facingDirection < 0f;
             _sensor.SetFacingDirection(_facingDirection);
+            FlipAttackHitboxes(_facingDirection);
+        }
+
+        /// <summary>
+        /// 방향 전환 시 적 공격 히트박스 localPosition.x 반전.
+        /// EnemyKnightAttack 의 AttackHitbox 와 UpdateChaseDirection 에서도 호출.
+        /// </summary>
+        private void FlipAttackHitboxes(float dir)
+        {
+            // EnemyKnightAttack 히트박스 반전
+            var knightAttack = GetComponent<EnemyKnightAttack>();
+            if (knightAttack != null)
+                knightAttack.FlipHitbox(dir);
         }
 
         private void UpdateChaseDirection()
@@ -433,6 +452,7 @@ namespace KEY
             if (_spriteRenderer != null)
                 _spriteRenderer.flipX = _facingDirection < 0f;
             _sensor.SetFacingDirection(_facingDirection);
+            FlipAttackHitboxes(_facingDirection);
         }
 
         private void StopHorizontal()
