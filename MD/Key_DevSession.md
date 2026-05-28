@@ -363,14 +363,62 @@ protected override bool IsReadyToFire => _sealData != null;
 
 | 항목 | 상태 | 메모 |
 |---|---|---|
-| Player.controller 에디터 수정 | 🔲 미착수 | v0.7 가이드 참고 |
-| Attack 클립 Loop Time OFF | 🔲 필수 | PlayerAttack01/02/03.anim |
+| Player.controller 에디터 수정 | ✅ 완료 | v0.7 가이드 참고 |
+| Attack 클립 Loop Time OFF | ✅ 완료 | PlayerAttack01/02/03.anim |
 | 스프라이트 / 애니메이션 클립 | 🔲 미착수 | 완성 후 클립 연결 |
 | AnimatorOverrideController 세팅 | 🔲 보류 | 스프라이트 완성 후 |
-| SealProjectile Prefab 생성 | 🔲 미착수 | Hierarchy 가이드 참고 |
-| EnemySealComponent 적 부착 | 🔲 미착수 | Enemy_Knight 에 우선 부착 |
-| SealData 에셋 생성 | 🔲 미착수 | Assets/KEY/DataSO/Seals/ |
+| SealProjectile Prefab 생성 | ✅ 완료 | Hierarchy 가이드 참고 |
+| EnemySealComponent 적 부착 | ✅ 완료 | Enemy_Knight 에 우선 부착 |
+| SealData 에셋 생성 | ✅ 완료 | Assets/KEY/DataSO/Seals/ |
 | 자물쇠 해제 조건 다양화 | 🔲 미착수 | LockComponent 확장 필요 |
 | 테스트 씬 구성 | 🔲 미착수 | 봉인 시스템 포함 전투 테스트 |
 | GameManager | 🔲 미착수 | 씬 전역 관리 |
 | CinemachineCamera | 🔲 미착수 | 플레이어 추적 카메라 |
+
+---
+
+### v0.11 — 히트박스 좌우 반전 처리
+
+**배경**
+`PlayerMover.SpriteRenderer.flipX` 로 플레이어 스프라이트를 반전하고
+`PlayerWeaponMover` 가 Weapon `localPosition.x` 를 반전하지만
+Hitbox 오브젝트의 `BoxCollider2D` 판정 위치는 그대로 유지되는 버그.
+왼쪽 방향 공격 시 히트박스 판정이 오른쪽에 남아있는 현상.
+
+**원인**
+`SpriteRenderer.flipX` 는 렌더링만 뒤집고 `Collider2D` 의 월드 위치 계산에는 영향을 주지 않음.
+`box.transform.localPosition` 은 flipX 와 무관하게 씬 배치 기준 그대로 유지.
+
+**완성 파일**
+
+| 파일 | 변경 내용 | 버전 |
+|---|---|---|
+| `PlayerWeaponHitboxManager.cs` | `FlipHitboxes()` 추가, `_HitBoxPosition` 캐시, `OnFlipped` 구독 | v1.1 |
+| `PlayerWeaponMover.cs` | `HandleFlipped()` 에 `_spriteRenderer.flipX` 추가 | v1.1 |
+
+**수정 구조**
+
+```csharp
+// PlayerWeaponHitboxManager — Awake 에서 초기 localPosition 캐싱
+_HitBoxPosition[i] = box.gameObject.transform.localPosition;
+
+// FlipHitboxes — HandleFlipped 와 동일 패턴
+_HitBoxPosition[i] = new Vector3(
+    Mathf.Abs(_HitBoxPosition[i].x) * newDir,
+    _HitBoxPosition[i].y,
+    _HitBoxPosition[i].z);
+box.transform.localPosition = _HitBoxPosition[i];
+
+// PlayerWeaponMover.HandleFlipped — Weapon 스프라이트 반전 추가
+_spriteRenderer.flipX = newDir > 0 ? false : true;
+```
+
+**OnFlipped 구독자 최종 목록**
+
+| 구독자 | 처리 내용 |
+|---|---|
+| `PlayerWeaponMover.HandleFlipped` | Weapon `localPosition.x` 반전 + `SpriteRenderer.flipX` |
+| `PlayerWeaponHitboxManager.FlipHitboxes` | 각 Hitbox `transform.localPosition.x` 반전 |
+
+**주의 사항**
+`PlayerWeaponHitboxManager` 에 `using Unity.VisualScripting;` 이 실수로 추가됨 → 제거 예정 (본인 처리).

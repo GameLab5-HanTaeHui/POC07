@@ -40,13 +40,16 @@ Player
       ├── [SealKeyWeapon]          비활성 대기 (KeyType.Seal)
       │     └── _projectilePrefab = SealProjectile.prefab
       │
-      ├── [PlayerWeaponAnimator]        무기 이벤트 구독 → PlayerWeaponMover 호출
-      ├── [PlayerWeaponMover]           DOTween 스윙 이동 전담 (v1.1)
-      └── [PlayerWeaponHitboxManager] * 히트박스 관리
-            ├── Hitbox_Combo1    [BoxCollider2D] isTrigger=ON
-            ├── Hitbox_Combo2    [BoxCollider2D] isTrigger=ON
-            ├── Hitbox_Combo3    [BoxCollider2D] isTrigger=ON
-            └── Hitbox_AirAttack [BoxCollider2D] isTrigger=ON
+      ├── [PlayerWeaponAnimator]          무기 이벤트 구독 → PlayerWeaponMover 호출
+      ├── [PlayerWeaponMover]             DOTween 스윙 이동 전담 (v1.1)
+      │     └── OnFlipped 구독            _originLocalPosition.x 반전 + SpriteRenderer.flipX
+      ├── [PlayerWeaponHitboxManager] * 히트박스 관리 (v1.1)
+      │     └── OnFlipped 구독            FlipHitboxes() → 각 Hitbox localPosition.x 반전
+      │
+      ├── Hitbox_Combo1    [BoxCollider2D] isTrigger=ON   ← Weapon 직속 자식
+      ├── Hitbox_Combo2    [BoxCollider2D] isTrigger=ON
+      ├── Hitbox_Combo3    [BoxCollider2D] isTrigger=ON
+      └── Hitbox_AirAttack [BoxCollider2D] isTrigger=ON
 ```
 
 ### Player 컴포넌트 연결 체크리스트
@@ -69,6 +72,13 @@ Player
 | PlayerWeaponHitboxManager | _hitboxes[0~3] | 각 Hitbox BoxCollider2D |
 | PlayerWeaponHitboxManager | _hitLayer | Enemy 레이어 |
 | Animator | Controller | Player.controller |
+
+### OnFlipped 이벤트 구독자 (v0.11 기준)
+
+| 구독자 | 처리 내용 | 버전 |
+|---|---|---|
+| `PlayerWeaponMover.HandleFlipped` | `_originLocalPosition.x` 반전 + `SpriteRenderer.flipX` | v1.1 |
+| `PlayerWeaponHitboxManager.FlipHitboxes` | 각 Hitbox `transform.localPosition.x` 반전 | v1.1 |
 
 ---
 
