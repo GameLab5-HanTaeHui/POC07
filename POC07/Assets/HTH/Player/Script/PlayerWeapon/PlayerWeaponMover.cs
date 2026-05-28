@@ -79,6 +79,11 @@ namespace KEY
         private Coroutine _swingCoroutine;
 
         /// <summary>
+        /// 무기 오브젝트 스프라이트
+        /// </summary>
+        private SpriteRenderer _spriteRenderer;
+
+        /// <summary>
         /// Weapon 오브젝트의 로컬 원점 위치.
         /// Awake 에서 초기값 캐싱.
         /// OnFlipped 수신 시 X 부호가 반전됨.
@@ -109,6 +114,7 @@ namespace KEY
         private void Awake()
         {
             _originLocalPosition = transform.localPosition;
+            _spriteRenderer = GetComponent<SpriteRenderer>();
         }
 
         /// <summary>
@@ -160,10 +166,10 @@ namespace KEY
         private void HandleFlipped(float newDir)
         {
             // X 부호만 반전 (Y, Z 는 유지)
-            _originLocalPosition = new Vector3(
-                Mathf.Abs(_originLocalPosition.x) * newDir,
-                _originLocalPosition.y,
-                _originLocalPosition.z);
+            _originLocalPosition = new Vector3(Mathf.Abs(_originLocalPosition.x) * newDir,
+                _originLocalPosition.y, _originLocalPosition.z);
+            // 스프라이트 반전
+            _spriteRenderer.flipX = newDir > 0 ? false : true;
 
             if (IsSwinging)
             {
