@@ -26,16 +26,26 @@ MonoBehaviour:
   idleChance: 0.4
   patrolSightRange: 6
   chaseSightRadius: 10
-  attackRange: 1.5
+  attackRange: 10
   wallCheckDistance: 0.6
   cliffCheckDistance: 1
   cliffCheckOffset: 0.4
   attackDamage: 15
   attackCooldown: 2
   attackDuration: 0.3
+  chargeWindupTime: 0.6
+  chargeSpeed: 14
+  chargeDuration: 0.8
+  chargeDamage: 25
+  chargeKnockbackMultiplier: 2
+  chargeCooldown: 5
+  chargeDetectRange: 5
   playerLayer:
     serializedVersion: 2
     m_Bits: 1024
   groundLayer:
     serializedVersion: 2
     m_Bits: 1048576
+  attackHitLayer:
+    serializedVersion: 2
+    m_Bits: 1024

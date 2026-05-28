@@ -1,32 +1,24 @@
 ﻿// ============================================================
-// EnemyAI.cs  v3.0
-// 적 공용 AI — 봉인 시스템 연동
+// EnemyAI.cs  v4.0
+// 적 공용 AI — DataSO 참조 구조 개선
 //
-// [v3.0 변경 — EnemySealComponent 연동]
-//   Awake 에서 EnemySealComponent 자동 취득.
-//   행동 실행 직전 IsSealedAction(SealType) 체크 추가.
+// [v4.0 변경 — DataSO 단일 연결 지점]
+//   [SerializeField] private EnemyDataSO _settings 제거.
+//   Awake 에서 GetComponent<EnemyBase>().Settings 로 취득.
+//   → Inspector 에서 EnemyAI 에 DataSO 를 별도 연결할 필요 없음.
+//   → EnemyBase 에 연결된 DataSO 하나가 전체에 흘러감.
 //
-//   [체크 위치 3곳]
-//     OnPatrolMove()  → SealType.Move / SealType.Dash
-//     OnChaseMove()   → SealType.Move
-//     OnEnterAttack() → SealType.Attack
+//   [데이터 흐름]
+//     EnemyBase._settings (Inspector 연결)
+//       → EnemyAI.Awake()    : _settings = GetComponent<EnemyBase>().Settings
+//       → EnemySensor        : _sensor.SetData(_settings)
+//       → EnemyKnightAttack  : knightAttack.SetData(_settings)
 //
-//   [SealType.Move]
-//     Patrol / Chase 이동 전부 차단.
-//     이동 속도를 0 으로 유지하고 현재 상태를 변경하지 않음.
-//     봉인 해제 시 자동으로 이동 재개.
-//
-//   [SealType.Dash]
-//     OnPatrolMove 에서 Knight 의 돌진 유사 패턴 차단 전용.
-//     현재 Patrol 이동을 차단하여 전진 억제.
-//     추후 실제 Dash 패턴 추가 시 해당 위치에도 체크 추가.
-//
-//   [SealType.Attack]
-//     OnEnterAttack() 진입 시 체크.
-//     봉인 중이면 공격 실행 없이 Chase 로 복귀.
+// [v3.0 변경]
+//   EnemySealComponent 연동, 봉인 행동 차단 체크.
 //
 // [v2.0 변경]
-//   KnightAI 제거 → 이 파일 하나로 모든 적 AI 통합.
+//   KnightAI 제거 → 단일 통합 AI.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -38,20 +30,17 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 공용 AI 컴포넌트. (v3.0)
+    /// 적 공용 AI 컴포넌트. (v4.0)
     ///
     /// ────────────────────────────────────────────────────
-    /// [봉인 체크 흐름]
-    ///   SealProjectile → EnemySealComponent.ApplySeal()
-    ///     → _activeSeals 에 SealType 등록
-    ///       → EnemyAI 행동 시도 시 IsSealedAction() 확인
-    ///         → true 이면 해당 행동 스킵
-    ///
-    /// [봉인 해제 시]
-    ///   EnemySealComponent.Update() 에서 타이머 만료 감지
-    ///     → _activeSeals 에서 해당 타입 제거
-    ///       → 다음 프레임부터 EnemyAI 가 IsSealedAction() = false 로 판단
-    ///         → 행동 자동 재개
+    /// [DataSO 취득 순서]
+    ///   Awake 실행 순서: EnemyBase.Awake → EnemyAI.Awake
+    ///   (같은 오브젝트의 Awake 는 컴포넌트 순서에 따름)
+    ///   EnemyAI.Awake 에서 GetComponent<EnemyBase>() 를 호출하므로
+    ///   EnemyBase 가 먼저 Awake 되어 있어야 함.
+    ///   → Inspector 에서 EnemyBase(EnemyKnight 등) 를
+    ///     EnemyAI 보다 위에 배치 권장.
+    ///   → 순서 보장이 필요하면 Script Execution Order 설정 가능.
     /// ────────────────────────────────────────────────────
     /// </summary>
     [RequireComponent(typeof(EnemySensor))]
@@ -66,29 +55,30 @@ namespace KEY
         {
             /// <summary> 순찰 — 좌우 이동, 직선 감지. </summary>
             Patrol,
-
             /// <summary> 랜덤 정지 — 대기 후 Patrol 복귀. </summary>
             Idle,
-
             /// <summary> 추격 — 플레이어 추적, 원형 감지. </summary>
             Chase,
-
             /// <summary> 공격 — 공격 모션 실행 중. </summary>
             Attack,
         }
 
         // ──────────────────────────────────────────
-        // Inspector
+        // DataSO — Inspector 연결 없음 (v4.0)
         // ──────────────────────────────────────────
-
-        [Header("── 필수 연결 ──────────────────────")]
 
         /// <summary>
         /// 적 수치 + 타입 SO.
-        /// enemyType 으로 행동 분기.
+        /// Inspector 에서 직접 연결하지 않음.
+        /// Awake 에서 EnemyBase.Settings 를 통해 취득.
         /// </summary>
-        [Tooltip("EnemyDataSO. 필수 연결.")]
-        [SerializeField] private EnemyDataSO _settings;
+        private EnemyDataSO _settings;
+
+        /// <summary>
+        /// 차징 돌진 공격 컴포넌트.
+        /// Awake 에서 자동 취득. 없으면 차징 없이 일반 공격만.
+        /// </summary>
+        private EnemyKnightChargeAttack _chargeAttack;
 
         // ──────────────────────────────────────────
         // 컴포넌트 참조
@@ -100,9 +90,8 @@ namespace KEY
         private SpriteRenderer _spriteRenderer;
 
         /// <summary>
-        /// 봉인 상태 컴포넌트. v3.0 추가.
-        /// Awake 에서 자동 취득. 미부착 시 null 허용
-        /// (봉인 시스템 없이도 정상 동작).
+        /// 봉인 상태 컴포넌트.
+        /// Awake 에서 자동 취득. 미부착 시 null 허용.
         /// </summary>
         private EnemySealComponent _sealComponent;
 
@@ -131,32 +120,56 @@ namespace KEY
         private void Awake()
         {
             _sensor = GetComponent<EnemySensor>();
-            _attack = GetComponent<EnemyAttackBase>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
-
-            // 봉인 컴포넌트 취득 — 없어도 경고 없음 (선택적 기능)
             _sealComponent = GetComponent<EnemySealComponent>();
+            _chargeAttack = GetComponent<EnemyKnightChargeAttack>();
+
+            // _attack 은 EnemyKnightAttack(근접) 만 취득
+            // GetComponent<EnemyAttackBase>() 는 EnemyKnightChargeAttack 도 반환할 수 있으므로
+            // EnemyKnightAttack 을 명시적으로 취득
+            _attack = GetComponent<EnemyKnightAttack>() as EnemyAttackBase
+                      ?? GetComponent<EnemyAttackBase>();
+
+            // ★ DataSO 는 EnemyBase 에서 가져옴 (Inspector 직접 연결 제거)
+            var enemyBase = GetComponent<EnemyBase>();
+            if (enemyBase != null)
+            {
+                _settings = enemyBase.Settings;
+            }
+            else
+            {
+                Debug.LogError("[EnemyAI] EnemyBase 컴포넌트를 찾을 수 없습니다. " +
+                               "EnemyKnight 등 EnemyBase 상속 컴포넌트가 같은 오브젝트에 있어야 합니다.");
+            }
         }
 
         private void Start()
         {
             if (_settings == null)
             {
-                Debug.LogError($"[EnemyAI] EnemyDataSO 가 연결되지 않았습니다.");
+                Debug.LogError("[EnemyAI] EnemyDataSO 취득 실패. " +
+                               "EnemyBase 컴포넌트의 DataSO 슬롯을 확인하세요.");
                 enabled = false;
                 return;
             }
 
+            // EnemySensor 에 DataSO 주입
             _sensor.SetData(_settings);
             _sensor.SetFacingDirection(_facingDirection);
 
+            // EnemyKnightAttack 에 DataSO 주입
             var knightAttack = GetComponent<EnemyKnightAttack>();
             if (knightAttack != null)
                 knightAttack.SetData(_settings);
 
+            // EnemyKnightChargeAttack 에 DataSO 주입
+            if (_chargeAttack != null)
+                _chargeAttack.SetData(_settings);
+
+            // 공격 완료 이벤트 구독
             if (_attack != null)
-                _attack.OnAttackFinished += () => ChangeState(AIState.Chase);
+                _attack.OnAttackFinished += HandleAttackFinished;
 
             // Dummy 타입은 AI 비활성
             if (_settings.enemyType == EnemyType.Dummy ||
@@ -169,36 +182,22 @@ namespace KEY
         private void OnDestroy()
         {
             if (_attack != null)
-                _attack.OnAttackFinished -= () => ChangeState(AIState.Chase);
+                _attack.OnAttackFinished -= HandleAttackFinished;
         }
 
-        private void Update()
-        {
-            UpdateState();
-        }
-
-        private void FixedUpdate()
-        {
-            UpdateMovement();
-        }
+        private void Update() => UpdateState();
+        private void FixedUpdate() => UpdateMovement();
 
         // ══════════════════════════════════════════════════════
-        // 봉인 체크 — 내부 유틸리티
+        // 봉인 체크
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 지정 봉인 타입이 현재 활성 중인지 확인.
-        ///
-        /// [null 안전]
-        ///   _sealComponent 가 없으면 항상 false 반환.
-        ///   봉인 컴포넌트 미부착 적은 봉인 효과를 받지 않음.
+        /// 지정 봉인 타입 활성 여부.
+        /// _sealComponent 없으면 항상 false.
         /// </summary>
-        /// <param name="sealType">확인할 봉인 타입</param>
-        /// <returns>봉인 활성 중이면 true, 미활성 or 컴포넌트 없으면 false</returns>
         private bool IsSealed(SealType sealType)
-        {
-            return _sealComponent != null && _sealComponent.IsSealedAction(sealType);
-        }
+            => _sealComponent != null && _sealComponent.IsSealedAction(sealType);
 
         // ══════════════════════════════════════════════════════
         // 상태 업데이트
@@ -233,6 +232,14 @@ namespace KEY
                         ChangeState(AIState.Patrol);
                         return;
                     }
+                    // 차징 감지 범위 안 + 차징 쿨타임 완료 → 차징 공격 우선
+                    if (_chargeAttack != null && _chargeAttack.CanAttack
+                        && _sensor.CheckChargeRange())
+                    {
+                        ChangeState(AIState.Attack);
+                        return;
+                    }
+                    // 근접 사정거리 안 → 일반 공격
                     if (_sensor.CheckAttackRange() && _attack != null && _attack.CanAttack)
                     {
                         ChangeState(AIState.Attack);
@@ -242,7 +249,6 @@ namespace KEY
                     break;
 
                 case AIState.Attack:
-                    // 공격 완료는 OnAttackFinished 이벤트로 처리
                     break;
             }
         }
@@ -261,23 +267,15 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // 상태별 행동 — EnemyType 분기 + 봉인 체크
+        // 상태별 행동
         // ══════════════════════════════════════════════════════
 
         /// <summary>
         /// 순찰 이동.
-        ///
-        /// [봉인 체크]
-        ///   SealType.Move  : 이동 전체 차단 → 정지
-        ///   SealType.Dash  : Knight 전진 패턴 차단 → 정지
-        ///   (두 봉인 중 하나라도 활성이면 정지)
-        ///
-        /// [봉인 해제 후]
-        ///   다음 프레임 UpdateMovement() 에서 자동 재개.
+        /// Move / Dash 봉인 활성 시 정지.
         /// </summary>
         private void OnPatrolMove()
         {
-            // Move 또는 Dash 봉인 활성 시 순찰 이동 정지
             if (IsSealed(SealType.Move) || IsSealed(SealType.Dash))
             {
                 StopHorizontal();
@@ -291,24 +289,15 @@ namespace KEY
                         _facingDirection * _settings.patrolSpeed,
                         _rigid2D.linearVelocity.y);
                     break;
-
-                // 추후 Drone 등 추가
-                default:
-                    break;
             }
         }
 
         /// <summary>
         /// 추격 이동.
-        ///
-        /// [봉인 체크]
-        ///   SealType.Move : 이동 전체 차단 → 정지.
-        ///   Dash 봉인은 추격 이동에는 영향 없음
-        ///   (추격은 Dash 가 아닌 일반 이동 패턴).
+        /// Move 봉인 활성 시 정지.
         /// </summary>
         private void OnChaseMove()
         {
-            // Move 봉인 활성 시 추격 이동 정지
             if (IsSealed(SealType.Move))
             {
                 StopHorizontal();
@@ -322,42 +311,27 @@ namespace KEY
                         _facingDirection * _settings.chaseSpeed,
                         _rigid2D.linearVelocity.y);
                     break;
-
-                default:
-                    break;
             }
         }
 
         /// <summary>
         /// 공격 상태 진입.
-        ///
-        /// [봉인 체크]
-        ///   SealType.Attack : 공격 실행 차단 → 즉시 Chase 복귀.
-        ///   봉인 중에는 Attack 상태에 머무는 것 자체를 막음.
-        ///   Chase 로 복귀 후 사정거리 안에 있으면 재진입 시도하지만
-        ///   봉인이 유지되는 한 계속 차단됨.
-        ///
-        /// [SealType.Ranged]
-        ///   원거리 공격 전용 봉인.
-        ///   EnemyAttackBase 하위 클래스가 원거리 공격이라면
-        ///   해당 ExecuteAttack() 내부에서 별도 체크 권장.
-        ///   여기서는 Attack 봉인만 전역 차단.
+        /// Attack 봉인 활성 시 Chase 복귀.
         /// </summary>
         private void OnEnterAttack()
         {
             StopHorizontal();
 
-            // Attack 봉인 활성 시 공격 불가 → Chase 복귀
             if (IsSealed(SealType.Attack))
             {
-                Debug.Log($"[EnemyAI] 공격 봉인 활성 — 공격 차단 ({_settings.enemyName})");
+                Debug.Log($"[EnemyAI] 공격 봉인 활성 → 차단 ({_settings.enemyName})");
                 ChangeState(AIState.Chase);
                 return;
             }
 
             if (_attack == null)
             {
-                Debug.LogWarning($"[EnemyAI] EnemyAttackBase 컴포넌트가 없습니다. ({_settings.enemyType})");
+                Debug.LogWarning($"[EnemyAI] EnemyAttackBase 없음. ({_settings.enemyType})");
                 ChangeState(AIState.Chase);
                 return;
             }
@@ -365,14 +339,48 @@ namespace KEY
             switch (_settings.enemyType)
             {
                 case EnemyType.Knight:
-                    _attack.TryAttack(_settings.attackCooldown);
-                    break;
+                    // [공격 우선순위]
+                    // 차징 감지 범위 안 + 쿨타임 완료 → 차징 돌진 (주력)
+                    // 근접 사정거리 안 or 차징 쿨타임 중 → 일반 근접 공격 (보조)
+                    bool inChargeRange = _sensor.CheckChargeRange();
+                    bool chargeReady = _chargeAttack != null && _chargeAttack.CanAttack;
+                    bool inAttackRange = _sensor.CheckAttackRange();
+                    bool normalReady = _attack != null && _attack.CanAttack;
 
+                    if (chargeReady && inChargeRange && !inAttackRange)
+                    {
+                        // 차징 범위 안에 있고 근접 사정거리 밖 → 차징 돌진
+                        _chargeAttack.TryAttack(_settings.chargeCooldown);
+                        Debug.Log("[EnemyAI] Knight 차징 돌진 실행");
+                    }
+                    else if (normalReady && inAttackRange)
+                    {
+                        // 근접 사정거리 안 → 일반 공격
+                        _attack.TryAttack(_settings.attackCooldown);
+                        Debug.Log("[EnemyAI] Knight 근접 공격 실행");
+                    }
+                    else if (chargeReady && inChargeRange)
+                    {
+                        // 근접 사정거리 안이지만 차징도 가능 → 차징 우선
+                        _chargeAttack.TryAttack(_settings.chargeCooldown);
+                        Debug.Log("[EnemyAI] Knight 차징 돌진 실행 (근접 사정거리 내)");
+                    }
+                    else
+                    {
+                        ChangeState(AIState.Chase);
+                    }
+                    break;
                 default:
                     ChangeState(AIState.Chase);
                     break;
             }
         }
+
+        // ══════════════════════════════════════════════════════
+        // 이벤트 핸들러
+        // ══════════════════════════════════════════════════════
+
+        private void HandleAttackFinished() => ChangeState(AIState.Chase);
 
         // ══════════════════════════════════════════════════════
         // 상태 전환
@@ -389,7 +397,6 @@ namespace KEY
                     if (_idleCoroutine != null) StopCoroutine(_idleCoroutine);
                     _idleCoroutine = StartCoroutine(IdleRoutine());
                     break;
-
                 case AIState.Attack:
                     OnEnterAttack();
                     break;
@@ -420,13 +427,12 @@ namespace KEY
             if (player == null) return;
 
             float dir = player.position.x > transform.position.x ? 1f : -1f;
-            if (!Mathf.Approximately(dir, _facingDirection))
-            {
-                _facingDirection = dir;
-                if (_spriteRenderer != null)
-                    _spriteRenderer.flipX = _facingDirection < 0f;
-                _sensor.SetFacingDirection(_facingDirection);
-            }
+            if (Mathf.Approximately(dir, _facingDirection)) return;
+
+            _facingDirection = dir;
+            if (_spriteRenderer != null)
+                _spriteRenderer.flipX = _facingDirection < 0f;
+            _sensor.SetFacingDirection(_facingDirection);
         }
 
         private void StopHorizontal()
@@ -454,8 +460,6 @@ namespace KEY
         private void OnDrawGizmosSelected()
         {
             if (_sealComponent == null || !_sealComponent.HasAnySeal) return;
-
-            // 봉인 활성 시 AI 위에 [봉인] 표시
             UnityEditor.Handles.color = Color.cyan;
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * 2.5f,

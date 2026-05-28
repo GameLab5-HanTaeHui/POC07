@@ -1,17 +1,15 @@
 ﻿// ============================================================
-// EnemyBase.cs  v1.1
+// EnemyBase.cs  v1.2
 // 적 베이스 클래스
 //
-// [v1.1 변경 — 넉백 방식 전면 교체]
-//   문제:
-//     AddForce(Impulse) 방식은 gravityScale = 0 에서
-//     마찰/감속이 없어 velocity 가 누적되어 계속 날아감.
-//     gravityScale = 1 로 변경해도 중력까지 더해져 더 심해짐.
-//   해결:
-//     넉백을 코루틴(KnockbackRoutine) 으로 교체.
-//     velocity 를 직접 설정 후 _knockbackDecay 비율로 매 프레임 감속.
-//     넉백 종료 후 velocity = zero 로 완전 정지 보장.
-//     더미는 gravityScale=0 + FreezePositionY 로 Y 축 완전 고정.
+// [v1.2 변경 — DataSO 단일 연결 지점 확립]
+//   Settings 프로퍼티 추가 (public).
+//   EnemyAI / EnemySensor / EnemyKnightAttack 이
+//   모두 이 프로퍼티를 통해 DataSO 를 참조.
+//   → Inspector 에서 DataSO 를 꽂는 곳은 EnemyBase 하나뿐.
+//
+// [v1.1 변경]
+//   넉백 방식 AddForce → KnockbackRoutine 코루틴으로 교체.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -23,14 +21,19 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 베이스 추상 클래스. (v1.1)
+    /// 적 베이스 추상 클래스. (v1.2)
     ///
     /// ────────────────────────────────────────────────────
-    /// [넉백 동작]
-    ///   1. velocity = direction * knockbackForce 로 초기 속도 설정
-    ///   2. 매 FixedUpdate 마다 velocity *= knockbackDecay 로 감속
-    ///   3. velocity.magnitude 가 0.1 이하 or 시간 초과 시 완전 정지
-    ///   → 짧게 밀렸다가 멈추는 자연스러운 넉백
+    /// [DataSO 참조 구조 — v1.2]
+    ///   EnemyBase._settings    : Inspector 연결 (유일한 연결 지점)
+    ///   EnemyBase.Settings     : public 프로퍼티 → 외부 참조용
+    ///   EnemyAI.Awake()        : GetComponent<EnemyBase>().Settings 로 취득
+    ///   EnemySensor.SetData()  : EnemyAI 가 Awake 에서 호출
+    ///   EnemyKnightAttack      : EnemyAI 가 Start 에서 SetData() 호출
+    ///
+    /// [기존 EnemyAI Inspector 연결 제거]
+    ///   EnemyAI 의 _settings [SerializeField] 슬롯 삭제.
+    ///   Inspector 에서 EnemyAI 의 DataSO 슬롯은 더 이상 노출되지 않음.
     /// ────────────────────────────────────────────────────
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
@@ -45,8 +48,11 @@ namespace KEY
 
         /// <summary>
         /// 적 수치 설정 ScriptableObject.
+        /// ★ Inspector 연결 지점은 이 필드 하나뿐.
+        /// EnemyAI / EnemySensor / EnemyKnightAttack 은
+        /// EnemyBase.Settings 프로퍼티를 통해 참조.
         /// </summary>
-        [Tooltip("EnemyDataSO. 필수 연결.")]
+        [Tooltip("EnemyDataSO. 필수 연결. 이 컴포넌트에만 연결하면 됩니다.")]
         [SerializeField] protected EnemyDataSO _settings;
 
         // ──────────────────────────────────────────
@@ -96,6 +102,14 @@ namespace KEY
         /// <summary> 체력 비율 (0~1). UI 체력바용. </summary>
         public float HpRatio => MaxHp > 0f ? _currentHp / MaxHp : 0f;
 
+        /// <summary>
+        /// DataSO 외부 참조 프로퍼티. (v1.2 추가)
+        /// EnemyAI / EnemySensor / EnemyKnightAttack 에서
+        /// GetComponent<EnemyBase>().Settings 로 취득.
+        /// null 체크 없이 사용 시 Awake 이전 접근 주의.
+        /// </summary>
+        public EnemyDataSO Settings => _settings;
+
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
         // ══════════════════════════════════════════════════════
@@ -130,7 +144,7 @@ namespace KEY
             // ① 체력 감소 (최솟값 1 — 사망 없음)
             _currentHp = Mathf.Max(1f, _currentHp - info.Amount);
 
-            // ② 넉백 코루틴 (이전 넉백 있으면 즉시 중단 후 재시작)
+            // ② 넉백 코루틴
             if (_knockbackCoroutine != null)
                 StopCoroutine(_knockbackCoroutine);
             _knockbackCoroutine = StartCoroutine(KnockbackRoutine(info.Direction));
@@ -157,48 +171,34 @@ namespace KEY
 
         /// <summary>
         /// 넉백 코루틴.
-        ///
-        /// [동작 방식]
-        ///   velocity 를 direction * knockbackForce 로 직접 설정.
-        ///   매 FixedUpdate(WaitForFixedUpdate) 마다
-        ///   velocity.x *= knockbackDecay 로 감속.
-        ///   속도가 threshold 이하 or 최대 시간 초과 시 velocity = zero 로 완전 정지.
-        ///
-        /// [gravityScale = 0 에서 정상 동작하는 이유]
-        ///   AddForce 는 물리 엔진 내부 적분에 의존하므로
-        ///   gravityScale = 0 + FreezePositionY 환경에서 감속이 없음.
-        ///   velocity 를 직접 제어하면 gravity / drag 설정에 무관하게 동작.
+        /// velocity 를 direction * knockbackForce 로 설정 후
+        /// knockbackDecay 비율로 매 FixedUpdate 감속.
         /// </summary>
-        /// <param name="direction">넉백 방향 (정규화된 벡터)</param>
         private IEnumerator KnockbackRoutine(Vector2 direction)
         {
             if (_settings.knockbackForce <= 0f) yield break;
 
             _isKnockedBack = true;
 
-            // X 방향만 넉백 (Y 는 더미에서 FreezePositionY 로 고정)
             float velocityX = direction.x * _settings.knockbackForce;
             _rigid2D.linearVelocity = new Vector2(velocityX, _rigid2D.linearVelocity.y);
 
             float elapsed = 0f;
-            float maxTime = 0.5f;   // 최대 넉백 지속 시간 (초)
-            float threshold = 0.1f;   // 이 속도 이하면 즉시 정지
+            float maxTime = 0.5f;
+            float threshold = 0.1f;
 
             while (elapsed < maxTime)
             {
                 yield return new WaitForFixedUpdate();
                 elapsed += Time.fixedDeltaTime;
 
-                // 매 프레임 X 축 감속
                 float decayedX = _rigid2D.linearVelocity.x * _settings.knockbackDecay;
                 _rigid2D.linearVelocity = new Vector2(decayedX, _rigid2D.linearVelocity.y);
 
-                // 속도가 임계값 이하면 즉시 정지
                 if (Mathf.Abs(_rigid2D.linearVelocity.x) < threshold)
                     break;
             }
 
-            // 완전 정지 보장
             _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
             _isKnockedBack = false;
         }
@@ -207,10 +207,6 @@ namespace KEY
         // iFrame / 플래시 코루틴
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// iFrame 코루틴.
-        /// _settings.iFrameDuration 동안 무적 유지.
-        /// </summary>
         private IEnumerator InvincibleRoutine()
         {
             _isInvincible = true;
@@ -218,10 +214,6 @@ namespace KEY
             _isInvincible = false;
         }
 
-        /// <summary>
-        /// 피격 플래시 코루틴.
-        /// iFrame 시간 동안 빨간 깜빡임 반복.
-        /// </summary>
         private IEnumerator HitFlashRoutine()
         {
             float elapsed = 0f;
@@ -246,7 +238,7 @@ namespace KEY
 
         /// <summary>
         /// TakeDamage 처리 후 호출되는 확장점.
-        /// 하위 클래스에서 자물쇠 피격, 이펙트 등 추가 처리.
+        /// 하위 클래스에서 추가 처리.
         /// </summary>
         protected virtual void OnDamaged(DamageInfo info) { }
 
