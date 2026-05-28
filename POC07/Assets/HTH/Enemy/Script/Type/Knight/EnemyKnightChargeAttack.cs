@@ -1,25 +1,18 @@
 ﻿// ============================================================
-// EnemyKnightChargeAttack.cs  v1.4
-// 기사형 차징 돌진 — MovePosition 코루틴 방식
+// EnemyKnightChargeAttack.cs  v1.5
+// 기사형 차징 돌진 — ChargeHitbox FlipHitbox 추가
+//
+// [v1.5 변경]
+//   ChargeHitbox FlipHitbox() 외부 API 추가.
+//     → EnemyAI.FlipAttackHitboxes() 에서 호출 가능.
+//     → 방향 전환 시 _chargeHitbox localPosition.x 반전.
+//     → _originalChargeHitboxLocalX 필드 추가 (Awake 캐싱).
+//     → _chargeHitbox 가 null 이면 무시 (Raycast 전용 모드).
 //
 // [v1.4 변경]
-//   ① DOTween velocity 제어 방식 제거
-//       linearVelocity 는 구조체. DOTween 람다 setter 로 복사본만 수정.
-//       실제 Rigidbody 에 반영이 안 되어 돌진 불가 현상 발생.
-//       → MovePosition 을 매 FixedUpdate 단위로 호출하는 코루틴으로 교체.
-//       → 물리 충돌 유지 + 확실한 이동 보장.
-//
-//   ② ChargeHitbox 전용 콜라이더 분리
-//       GetComponent<Collider2D>() 로 본체 CapsuleCollider2D 가 잡히면
-//       CheckChargeHitWall() 에서 바닥을 즉시 감지 → 돌진 즉시 종료.
-//       → _chargeHitbox 가 null 이면 별도 Trigger 콜라이더 없이
-//         Raycast 만으로 충돌 감지하도록 변경.
-//
-//   ③ 돌진 이동 구현
-//       MovePosition 코루틴으로 매 FixedUpdate 단위 이동.
-//       이동 속도 = chargeSpeed (units/s).
-//       매 스텝마다 플레이어/벽 감지 후 충돌 시 즉시 종료.
-//       목표 위치 도달 시 자동 종료.
+//   DOTween velocity 제어 → MovePosition 코루틴 교체.
+//   ChargeHitbox 전용 콜라이더 분리.
+//   ScanForObstacle 이진탐색.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -33,22 +26,22 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 기사형 차징 돌진 공격. (v1.4)
+    /// 기사형 차징 돌진 공격. (v1.5)
     ///
     /// ────────────────────────────────────────────────────
     /// [Hierarchy 설정]
     ///   Enemy_Knight
     ///   ├── [EnemyKnightChargeAttack]
-    ///   │     _chargeHitbox = (선택) 별도 Trigger BoxCollider2D
+    ///   │     _chargeHitbox = ChargeHitbox/BoxCollider2D (선택)
     ///   ├── ChargeWarningLine
-    ///   │     └── [LineRenderer]  positionCount=2
+    ///   │     └── [LineRenderer]
     ///   └── (선택) TrailRenderer
     ///
-    /// [돌진 이동 방식]
-    ///   MovePosition 코루틴.
-    ///   목표 위치 = startPos + facingDir * _confirmedLength.
-    ///   매 FixedUpdate 단위로 chargeSpeed × dt 씩 이동.
-    ///   충돌 감지는 Raycast 전용 (본체 콜라이더 미사용).
+    /// [FlipHitbox 호출 시점]
+    ///   EnemyAI.Flip() / UpdateChaseDirection()
+    ///     → FlipAttackHitboxes(dir)
+    ///         → EnemyKnightAttack.FlipHitbox(dir)
+    ///         → EnemyKnightChargeAttack.FlipHitbox(dir)  ← v1.5 추가
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class EnemyKnightChargeAttack : EnemyAttackBase
@@ -62,10 +55,9 @@ namespace KEY
         /// <summary>
         /// 돌진 피격 전용 Trigger Collider2D.
         /// 미연결 시 Raycast 만으로 플레이어 피격 판정.
-        /// 연결 시 더 넓은 판정 가능.
-        /// ★ 본체 CapsuleCollider2D 를 절대 연결하지 말 것.
+        /// ★ 본체 CapsuleCollider2D 연결 금지.
         /// </summary>
-        [Tooltip("돌진 전용 Trigger 콜라이더. 미연결 시 Raycast 만으로 판정. " +
+        [Tooltip("돌진 전용 Trigger 콜라이더. 미연결 시 Raycast 전용. " +
                  "본체 CapsuleCollider2D 연결 금지.")]
         [SerializeField] private Collider2D _chargeHitbox;
 
@@ -104,11 +96,29 @@ namespace KEY
         private SpriteRenderer _spriteRenderer;
 
         // ──────────────────────────────────────────
+        // 히트박스 방향 캐시 (v1.5 추가)
+        // ──────────────────────────────────────────
+
+        /// <summary>
+        /// _chargeHitbox 초기 localPosition.x 절댓값.
+        /// Awake 에서 캐싱. FlipHitbox 에서 방향 × 이 값으로 반전.
+        /// _chargeHitbox 가 null 이면 0 으로 유지.
+        /// </summary>
+        private float _originalChargeHitboxLocalX;
+
+        // ──────────────────────────────────────────
         // 버퍼
         // ──────────────────────────────────────────
 
         private readonly List<Collider2D> _overlapBuffer = new List<Collider2D>();
         private readonly HashSet<Collider2D> _hitTargets = new HashSet<Collider2D>();
+
+        // ──────────────────────────────────────────
+        // 내부 상태
+        // ──────────────────────────────────────────
+
+        /// <summary> ScanForObstacle 에서 확정된 돌진 가능 거리. </summary>
+        private float _confirmedLength;
 
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
@@ -119,8 +129,6 @@ namespace KEY
             _enemyAI = GetComponent<EnemyAI>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
-            // ★ _chargeHitbox 는 자동 탐색 없음 — Inspector 에서만 연결
-            //    GetComponent 로 본체 콜라이더가 잡히면 벽 즉시 감지 버그 발생
 
             if (_lineRenderer != null)
             {
@@ -130,13 +138,42 @@ namespace KEY
 
             if (_countdownText != null)
                 _countdownText.enabled = false;
+
+            // ★ ChargeHitbox localPosition.x 절댓값 캐싱 (v1.5)
+            if (_chargeHitbox != null)
+            {
+                _originalChargeHitboxLocalX =
+                    Mathf.Abs(_chargeHitbox.transform.localPosition.x);
+                _chargeHitbox.enabled = false;
+            }
         }
 
         // ══════════════════════════════════════════════════════
         // 외부 API
         // ══════════════════════════════════════════════════════
 
+        /// <summary> DataSO 주입. EnemyAI.Start() 에서 호출. </summary>
         public void SetData(EnemyDataSO data) => _data = data;
+
+        /// <summary>
+        /// 돌진 히트박스 localPosition.x 를 방향에 맞게 반전. (v1.5 추가)
+        /// EnemyAI.FlipAttackHitboxes() 에서 방향 전환 시 호출.
+        /// _chargeHitbox 가 null 이면 무시.
+        ///
+        /// [EnemyKnightAttack.FlipHitbox 와 동일한 패턴]
+        ///   _originalChargeHitboxLocalX × dir → localPosition.x 갱신.
+        /// </summary>
+        /// <param name="dir">+1 = 오른쪽, -1 = 왼쪽</param>
+        public void FlipHitbox(float dir)
+        {
+            if (_chargeHitbox == null) return;
+
+            Vector3 pos = _chargeHitbox.transform.localPosition;
+            _chargeHitbox.transform.localPosition = new Vector3(
+                _originalChargeHitboxLocalX * dir,
+                pos.y,
+                pos.z);
+        }
 
         // ══════════════════════════════════════════════════════
         // EnemyAttackBase 구현
@@ -147,249 +184,207 @@ namespace KEY
             if (_data == null) yield break;
 
             float facingDir = _enemyAI != null ? _enemyAI.FacingDirection : 1f;
-            float maxLength = _data.chargeSpeed * _data.chargeDuration;
 
-            float _confirmedLength = 0f;
-            bool _lineLocked = false;
+            // ① 카운트다운 + 경고선 점증
+            yield return StartCoroutine(CountdownRoutine(facingDir));
 
-            // ────────────────────────────────
-            // ① Countdown — LineRenderer 점차 증가
-            // ────────────────────────────────
-            _rigid2D.linearVelocity = Vector2.zero;
-
-            if (_lineRenderer != null)
+            // 돌진 가능 거리 미달 → 취소
+            if (_confirmedLength < 0.3f)
             {
-                _lineRenderer.enabled = true;
-                UpdateLineRenderer(facingDir, 0f, 0f);
+                HideWarning();
+                yield break;
             }
 
-            if (_countdownText != null) _countdownText.enabled = true;
+            HideWarning();
 
+            // ② 돌진 실행
+            yield return StartCoroutine(ChargeRoutine(facingDir));
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 카운트다운 코루틴
+        // ══════════════════════════════════════════════════════
+
+        private IEnumerator CountdownRoutine(float facingDir)
+        {
+            _confirmedLength = 0f;
             float elapsed = 0f;
+
+            if (_lineRenderer != null)
+                _lineRenderer.enabled = true;
 
             while (elapsed < _countdownDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / _countdownDuration);
+                float t = elapsed / _countdownDuration;
 
+                // 장애물 감지 → 돌진 가능 거리 확정
+                float scannedLength = ScanForObstacle(facingDir);
+                if (scannedLength < _data.chargeDetectRange)
+                    _confirmedLength = scannedLength;
+                else
+                    _confirmedLength = _data.chargeDetectRange;
+
+                // 경고선 업데이트
+                UpdateWarningLine(facingDir, t);
+
+                // 카운트다운 텍스트
                 if (_countdownText != null)
-                    _countdownText.text = Mathf.CeilToInt(_countdownDuration - elapsed + 1f).ToString();
-
-                if (_spriteRenderer != null)
-                    _spriteRenderer.color = Color.Lerp(Color.white, new Color(1f, 0.5f, 0f, 1f), t);
-
-                // 선 고정 전이면 매 프레임 장애물 탐지
-                if (!_lineLocked)
                 {
-                    float searchLength = maxLength * t;
-                    float hitLength = ScanForObstacle(facingDir, searchLength);
-
-                    if (hitLength < searchLength - 0.1f)
-                    {
-                        _confirmedLength = hitLength;
-                        _lineLocked = true;
-                        Debug.Log($"[KnightCharge] 장애물 → 돌진 거리 고정: {hitLength:F2}");
-                    }
-                    else
-                    {
-                        _confirmedLength = searchLength;
-                    }
+                    float remaining = Mathf.Ceil(_countdownDuration - elapsed);
+                    _countdownText.enabled = true;
+                    _countdownText.text = remaining.ToString("0");
                 }
 
-                UpdateLineRenderer(facingDir, _confirmedLength, t);
                 yield return null;
             }
 
-            // 카운트다운 종료 정리
-            if (_lineRenderer != null) _lineRenderer.enabled = false;
-            if (_countdownText != null) _countdownText.enabled = false;
-            if (_spriteRenderer != null) _spriteRenderer.color = Color.white;
+            if (_countdownText != null)
+                _countdownText.enabled = false;
+        }
 
-            if (_confirmedLength < 0.3f)
-            {
-                Debug.Log("[KnightCharge] 확정 거리 너무 짧음 → 돌진 취소");
-                yield break;
-            }
+        // ══════════════════════════════════════════════════════
+        // 돌진 코루틴
+        // ══════════════════════════════════════════════════════
 
-            // ────────────────────────────────
-            // ② Charge — MovePosition 코루틴
-            // ────────────────────────────────
+        private IEnumerator ChargeRoutine(float facingDir)
+        {
             if (_trailRenderer != null) _trailRenderer.emitting = true;
+            if (_chargeHitbox != null) _chargeHitbox.enabled = true;
+
             _hitTargets.Clear();
 
             Vector2 startPos = _rigid2D.position;
             Vector2 targetPos = startPos + new Vector2(facingDir * _confirmedLength, 0f);
-            float speed = _data.chargeSpeed;
+            float chargeSpeed = _data.chargeSpeed;
 
-            Debug.Log($"[KnightCharge] 돌진 시작 — 거리:{_confirmedLength:F2} 속도:{speed}");
-
-            while (true)
+            while (Vector2.Distance(_rigid2D.position, targetPos) > 0.05f)
             {
-                yield return new WaitForFixedUpdate();
+                // 벽 / 낭떠러지 감지
+                if (CheckChargeHitWall(facingDir)) break;
 
-                Vector2 current = _rigid2D.position;
-                float remaining = Vector2.Distance(current, targetPos);
+                // 플레이어 피격 감지
+                CheckChargeHitPlayer();
 
-                // 목표 도달
-                if (remaining < 0.05f)
-                {
-                    _rigid2D.MovePosition(targetPos);
-                    Debug.Log("[KnightCharge] 목표 위치 도달 → 종료");
-                    break;
-                }
-
-                // 이번 스텝 이동 거리
-                float step = Mathf.Min(speed * Time.fixedDeltaTime, remaining);
-                Vector2 nextPos = current + new Vector2(facingDir * step, 0f);
-
-                // 벽 Raycast 감지
-                if (HitWall(facingDir, step + 0.05f))
-                {
-                    Debug.Log("[KnightCharge] 벽 감지 → 종료");
-                    break;
-                }
-
-                // 플레이어 Raycast 감지
-                if (HitPlayer(facingDir, step + 0.15f))
-                    break;
+                // 이동
+                Vector2 nextPos = Vector2.MoveTowards(
+                    _rigid2D.position,
+                    targetPos,
+                    chargeSpeed * Time.fixedDeltaTime);
 
                 _rigid2D.MovePosition(nextPos);
+                yield return new WaitForFixedUpdate();
             }
 
-            // ────────────────────────────────
-            // ③ 종료
-            // ────────────────────────────────
+            // 종료 처리
             _rigid2D.linearVelocity = Vector2.zero;
+
+            if (_chargeHitbox != null) _chargeHitbox.enabled = false;
             if (_trailRenderer != null) _trailRenderer.emitting = false;
+
             _hitTargets.Clear();
-
-            yield return new WaitForSeconds(0.15f);
         }
 
         // ══════════════════════════════════════════════════════
-        // LineRenderer 제어
-        // ══════════════════════════════════════════════════════
-
-        private void UpdateLineRenderer(float facingDir, float length, float t)
-        {
-            if (_lineRenderer == null) return;
-
-            Vector3 origin = transform.position + Vector3.up * _rayOriginHeight;
-            Vector3 end = origin + new Vector3(facingDir * length, 0f, 0f);
-
-            _lineRenderer.SetPosition(0, origin);
-            _lineRenderer.SetPosition(1, end);
-
-            Color c = Color.Lerp(_warningColorStart, _warningColorEnd, t);
-            _lineRenderer.startColor = c;
-            _lineRenderer.endColor = c;
-        }
-
-        // ══════════════════════════════════════════════════════
-        // 장애물 스캔 (카운트다운 중)
+        // 장애물 스캔 (이진탐색)
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// searchLength 거리까지 벽/낭떠러지 감지.
-        /// 장애물 있으면 그 거리, 없으면 searchLength 반환.
+        /// 현재 방향으로 돌진 가능한 최대 거리를 이진탐색으로 계산.
+        /// 벽 수평 Ray + 낭떠러지 하향 Ray.
         /// </summary>
-        private float ScanForObstacle(float facingDir, float searchLength)
+        private float ScanForObstacle(float dir)
         {
-            if (_data == null || searchLength <= 0.01f) return searchLength;
+            float maxRange = _data.chargeDetectRange;
+            float lo = 0f, hi = maxRange;
 
-            Vector3 rayOrigin = transform.position + Vector3.up * _rayOriginHeight;
-
-            // 수평 벽 감지
-            RaycastHit2D wallHit = Physics2D.Raycast(
-                rayOrigin, new Vector2(facingDir, 0f), searchLength, _data.groundLayer);
-            if (wallHit.collider != null)
-                return Mathf.Max(0f, wallHit.distance - 0.15f);
-
-            // 낭떠러지 감지 — 끝 지점 아래 바닥 확인
-            Vector3 endPt = rayOrigin + new Vector3(facingDir * searchLength, 0f, 0f);
-            if (Physics2D.Raycast(endPt, Vector2.down, 2.0f, _data.groundLayer).collider == null)
-                return FindCliffEdge(rayOrigin, facingDir, searchLength);
-
-            return searchLength;
-        }
-
-        /// <summary>
-        /// 낭떠러지 직전 안전 거리를 이진 탐색으로 계산.
-        /// </summary>
-        private float FindCliffEdge(Vector3 rayOrigin, float facingDir, float maxDist)
-        {
-            float lo = 0f, hi = maxDist;
             for (int i = 0; i < 6; i++)
             {
                 float mid = (lo + hi) * 0.5f;
-                Vector3 pt = rayOrigin + new Vector3(facingDir * mid, 0f, 0f);
-                if (Physics2D.Raycast(pt, Vector2.down, 2.0f, _data.groundLayer).collider != null)
-                    lo = mid;
-                else
-                    hi = mid;
+                Vector2 testPos = _rigid2D.position + new Vector2(dir * mid, _rayOriginHeight);
+
+                bool wallHit = Physics2D.Raycast(
+                    testPos, new Vector2(dir, 0f), 0.2f,
+                    _data.groundLayer).collider != null;
+
+                bool cliffHit = !Physics2D.Raycast(
+                    testPos, Vector2.down, 1.5f,
+                    _data.groundLayer).collider;
+
+                if (wallHit || cliffHit) hi = mid;
+                else lo = mid;
             }
-            return Mathf.Max(0f, lo - 0.1f);
+
+            return lo;
         }
 
         // ══════════════════════════════════════════════════════
-        // 돌진 중 충돌 감지 (Raycast 전용)
+        // 충돌 감지
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 전방 dist 거리 Raycast — 벽 감지.
-        /// </summary>
-        private bool HitWall(float facingDir, float dist)
+        private bool CheckChargeHitWall(float dir)
         {
-            if (_data == null) return false;
-            Vector3 origin = transform.position + Vector3.up * _rayOriginHeight;
-            return Physics2D.Raycast(origin, new Vector2(facingDir, 0f),
-                dist, _data.groundLayer).collider != null;
+            Vector2 origin = _rigid2D.position + Vector2.up * _rayOriginHeight;
+            return Physics2D.Raycast(
+                origin,
+                new Vector2(dir, 0f),
+                0.3f,
+                _data.groundLayer).collider != null;
         }
 
-        /// <summary>
-        /// 전방 dist 거리 Raycast — 플레이어 감지 후 TakeDamage 호출.
-        /// </summary>
-        private bool HitPlayer(float facingDir, float dist)
+        private void CheckChargeHitPlayer()
         {
-            if (_data == null) return false;
+            if (_chargeHitbox == null) return;
 
-            Vector3 origin = transform.position + Vector3.up * _rayOriginHeight;
-            RaycastHit2D hit = Physics2D.Raycast(
-                origin, new Vector2(facingDir, 0f), dist, _data.attackHitLayer);
+            _overlapBuffer.Clear();
+            ContactFilter2D filter = new ContactFilter2D();
+            filter.SetLayerMask(_data.attackHitLayer);
+            filter.useTriggers = true;
 
-            if (hit.collider == null) return false;
-            if (_hitTargets.Contains(hit.collider)) return false;
+            _chargeHitbox.Overlap(filter, _overlapBuffer);
 
-            if (hit.collider.TryGetComponent<IDamageable>(out var dmg))
+            foreach (var col in _overlapBuffer)
             {
-                _hitTargets.Add(hit.collider);
-                dmg.TakeDamage(new DamageInfo(
-                    transform.position,
-                    _data.chargeDamage,
-                    new Vector2(facingDir, 0.1f).normalized,
-                    AttackType.Combo1));
-                Debug.Log($"[KnightCharge] 플레이어 피격: {_data.chargeDamage}");
-                return true;
+                if (_hitTargets.Contains(col)) continue;
+                if (!col.TryGetComponent<IDamageable>(out var dmg)) continue;
+
+                _hitTargets.Add(col);
+
+                float dir = _enemyAI != null ? _enemyAI.FacingDirection : 1f;
+                var info = new DamageInfo(
+                    attackerPosition: transform.position,
+                    amount: _data.chargeDamage,
+                    direction: new Vector2(dir, 0.1f).normalized,
+                    attackType: AttackType.Combo1
+                );
+                dmg.TakeDamage(info);
+                Debug.Log($"[ChargeAttack] 돌진 피격: {_data.chargeDamage}");
             }
-            return false;
         }
 
         // ══════════════════════════════════════════════════════
-        // Gizmos
+        // 경고선 보조
         // ══════════════════════════════════════════════════════
 
-        private void OnDrawGizmosSelected()
+        private void UpdateWarningLine(float dir, float t)
         {
-            if (_data == null) return;
-            float dir = _enemyAI != null ? _enemyAI.FacingDirection : 1f;
-            float length = _data.chargeSpeed * _data.chargeDuration;
-            Vector3 origin = transform.position + Vector3.up * _rayOriginHeight;
+            if (_lineRenderer == null) return;
 
-            Gizmos.color = new Color(1f, 0.4f, 0f, 0.4f);
-            Gizmos.DrawRay(origin, new Vector3(dir * length, 0f, 0f));
+            Vector3 start = transform.position;
+            Vector3 end = start + new Vector3(dir * _confirmedLength, 0f, 0f);
 
-            Gizmos.color = new Color(1f, 1f, 0f, 0.2f);
-            Gizmos.DrawWireSphere(transform.position, _data.chargeDetectRange);
+            _lineRenderer.SetPosition(0, start);
+            _lineRenderer.SetPosition(1, end);
+
+            Color color = Color.Lerp(_warningColorStart, _warningColorEnd, t);
+            _lineRenderer.startColor = color;
+            _lineRenderer.endColor = color;
+        }
+
+        private void HideWarning()
+        {
+            if (_lineRenderer != null) _lineRenderer.enabled = false;
+            if (_countdownText != null) _countdownText.enabled = false;
         }
     }
 }

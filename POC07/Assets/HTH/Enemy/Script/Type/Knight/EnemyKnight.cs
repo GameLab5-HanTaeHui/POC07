@@ -1,54 +1,55 @@
 ﻿// ============================================================
-// EnemyKnight.cs  v1.3
-// 기사형 적 — 방패 방어 + 자물쇠 해제 시스템
+// EnemyKnight.cs  v1.4
+// 기사형 적 — 자물쇠 List 확장
 //
-// [v1.3 변경 — 방어 로직 명확화]
-//   [핵심 설계]
-//     기사는 전방에 방패를 들고 있음.
-//     자물쇠 해제 전: 정면 공격 완전 무효, 후면 → 자물쇠 피격.
-//     자물쇠 해제 후: 방패 내려감 → 모든 방향 정상 피격.
+// [v1.4 변경 — LockComponent 단일 → List]
+//   _backLock (단일) → _locks List<LockComponent> 로 변경.
+//   Inspector 에서 여러 자물쇠 연결 가능.
+//   미연결 시 Awake 에서 GetComponentsInChildren 으로 자동 수집.
 //
-//   [피격 분기 흐름]
-//     1. 자물쇠 해제 완료   → EnemyBase.TakeDamage() (정상 피격)
-//     2. Guard 봉인 활성    → 방패 무시 → EnemyBase.TakeDamage() (정면도 피격)
-//     3. 정면 공격 (봉인 X) → 방패 완전 무효 (플래시 없음, 데미지 없음)
-//     4. 후면 공격 (봉인 X) → 자물쇠 피격 (Lock 의 hitCount 누적)
+//   [해제 조건 — 전부 해제 (기본값)]
+//     _unlockedCount == _locks.Count 일 때 약점 노출.
+//     추후 속성 자물쇠 / 부위별 조건으로 확장 가능한 구조.
 //
-//   [자물쇠 해제 후]
-//     _isLockUnlocked = true → 이후 TakeDamage 는 EnemyBase 로 정상 처리.
-//     사망 가능 상태로 전환.
+//   [후면 공격 처리]
+//     잠긴 자물쇠(_locks 中 IsUnlocked == false)를 순서대로 탐색.
+//     첫 번째 잠긴 자물쇠에 TakeDamage 전달.
+//     모두 해제 상태면 후면 공격도 EnemyBase 정상 피격.
 //
-// [v1.2 변경]
-//   Guard 봉인 체크 추가.
+//   [이벤트 구독]
+//     Start() 에서 _locks 전체 순회하여 각각 OnLockUnlocked / OnLockHit 구독.
+//     OnDestroy() 에서 전체 구독 해제.
+//
+// [v1.3 변경]
+//   방어 로직 명확화 — 정면/후면/봉인 분기.
 //
 // [네임스페이스]
 //   namespace : KEY
 // ============================================================
 
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KEY
 {
     /// <summary>
-    /// 기사형 적. EnemyBase 상속. (v1.3)
+    /// 기사형 적. EnemyBase 상속. (v1.4)
     ///
     /// ────────────────────────────────────────────────────
     /// [전투 흐름]
-    ///   플레이어가 정면 공격 시도
-    ///     → 방패 무효 (반응 없음)
-    ///     → 플레이어는 등 뒤로 돌아가야 함
+    ///   자물쇠 전부 해제 전 → 정면 공격 무효 / 후면 → 자물쇠 피격
+    ///   자물쇠 전부 해제 후 → 모든 방향 정상 피격
+    ///   Guard 봉인 활성    → 자물쇠 미해제여도 방패 무시 피격
     ///
-    ///   플레이어가 후면 공격 시도
-    ///     → LockComponent 피격 카운트 누적
-    ///     → 필요 횟수 도달 시 자물쇠 해제 → 약점 노출
+    /// [자물쇠 여러 개 처리]
+    ///   후면 공격 → 첫 번째 잠긴 자물쇠에 TakeDamage 전달
+    ///   모든 자물쇠 해제 → _isAllLocksUnlocked = true → 약점 노출
     ///
-    ///   자물쇠 해제 후 공격
-    ///     → EnemyBase.TakeDamage() 정상 처리
-    ///     → 체력 감소 → 사망 가능
-    ///
-    ///   Guard 봉인 활성 시
-    ///     → 정면 공격도 허용 → 자물쇠 해제 시간 확보
+    /// [추후 확장 포인트]
+    ///   - 속성 자물쇠 (특정 공격 유형만 해제)
+    ///   - 부위별 자물쇠 (다리/팔/머리 → 부위별 효과)
+    ///   - 일부 해제 조건 (n개 중 m개 해제 시 약점 노출)
+    ///   → CheckAllUnlocked() 메서드 하나만 수정하면 됨
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class EnemyKnight : EnemyBase
@@ -60,12 +61,16 @@ namespace KEY
         [Header("── 자물쇠 연결 ──────────────────────")]
 
         /// <summary>
-        /// 등 뒤 자물쇠 LockComponent.
-        /// 미연결 시 Awake 에서 자동 탐색.
-        /// 3단계에서 List 로 확장 예정.
+        /// 자물쇠 LockComponent 리스트.
+        /// Inspector 에서 드래그 연결. 순서 = 피격 우선순위.
+        /// 미연결 시 Awake 에서 GetComponentsInChildren 으로 자동 수집.
+        ///
+        /// [추후 속성 자물쇠 추가 시]
+        ///   이 리스트에 새 LockComponent 를 드래그 추가만 하면 됨.
         /// </summary>
-        [Tooltip("등 뒤 LockComponent. 미연결 시 자동 탐색.")]
-        [SerializeField] private LockComponent _backLock;
+        [Tooltip("자물쇠 LockComponent 리스트. 순서 = 피격 우선순위. " +
+                 "미연결 시 자동 수집.")]
+        [SerializeField] private List<LockComponent> _locks = new List<LockComponent>();
 
         // ──────────────────────────────────────────
         // 컴포넌트 참조
@@ -79,11 +84,17 @@ namespace KEY
         // ──────────────────────────────────────────
 
         /// <summary>
-        /// 자물쇠 해제 여부.
-        /// false : 방패 활성 — 정면 공격 무효, 후면 → 자물쇠 피격
-        /// true  : 방패 해제 — EnemyBase 정상 피격
+        /// 현재까지 해제된 자물쇠 수.
+        /// OnLockUnlocked 이벤트 수신 시 증가.
         /// </summary>
-        private bool _isLockUnlocked;
+        private int _unlockedCount;
+
+        /// <summary>
+        /// 모든 자물쇠 해제 여부.
+        /// true = 방패 해제 → EnemyBase 정상 피격.
+        /// false = 방패 활성 → 정면 공격 무효, 후면 → 자물쇠 피격.
+        /// </summary>
+        private bool _isAllLocksUnlocked;
 
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
@@ -96,29 +107,35 @@ namespace KEY
             _enemyAI = GetComponent<EnemyAI>();
             _sealComponent = GetComponent<EnemySealComponent>();
 
-            if (_backLock == null)
-                _backLock = GetComponentInChildren<LockComponent>();
+            // Inspector 미연결 시 자동 수집
+            if (_locks.Count == 0)
+            {
+                var found = GetComponentsInChildren<LockComponent>();
+                _locks.AddRange(found);
+            }
 
-            if (_backLock == null)
-                Debug.LogWarning("[EnemyKnight] LockComponent 를 찾을 수 없습니다. " +
+            if (_locks.Count == 0)
+                Debug.LogWarning("[EnemyKnight] LockComponent 가 없습니다. " +
                                  "자물쇠 없이 시작합니다.");
         }
 
         private void Start()
         {
-            if (_backLock != null)
+            foreach (var lock_ in _locks)
             {
-                _backLock.OnLockUnlocked += HandleLockUnlocked;
-                _backLock.OnLockHit += HandleLockHit;
+                if (lock_ == null) continue;
+                lock_.OnLockUnlocked += HandleLockUnlocked;
+                lock_.OnLockHit += HandleLockHit;
             }
         }
 
         private void OnDestroy()
         {
-            if (_backLock != null)
+            foreach (var lock_ in _locks)
             {
-                _backLock.OnLockUnlocked -= HandleLockUnlocked;
-                _backLock.OnLockHit -= HandleLockHit;
+                if (lock_ == null) continue;
+                lock_.OnLockUnlocked -= HandleLockUnlocked;
+                lock_.OnLockHit -= HandleLockHit;
             }
         }
 
@@ -127,28 +144,26 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 기사형 피격 처리. (v1.3)
+        /// 기사형 피격 처리. (v1.4)
         ///
         /// [분기 흐름]
-        ///   ① 자물쇠 해제 완료
-        ///      → EnemyBase.TakeDamage() 정상 처리 (체력 감소 + 사망 가능)
+        ///   ① 모든 자물쇠 해제 완료
+        ///      → EnemyBase.TakeDamage() 정상 처리
         ///
         ///   ② 자물쇠 미해제 + Guard 봉인 활성
-        ///      → 방패 무시 → EnemyBase.TakeDamage() 정상 처리
-        ///        (자물쇠가 있어도 체력이 직접 깎임. 공략 보조 수단.)
+        ///      → 방패 무시 → EnemyBase.TakeDamage()
         ///
         ///   ③ 자물쇠 미해제 + Guard 봉인 없음 + 정면 공격
-        ///      → 방패 완전 무효 (반응 없음 — 데미지 0, 플래시 없음)
-        ///        플레이어에게 "이쪽으로는 안 된다"는 명확한 피드백.
+        ///      → 방패 완전 무효 (반응 없음)
         ///
         ///   ④ 자물쇠 미해제 + Guard 봉인 없음 + 후면 공격
-        ///      → LockComponent.TakeDamage() 호출
-        ///        자물쇠 피격 카운트 누적 → 해제 조건 충족 시 OnLockUnlocked 발행
+        ///      → 첫 번째 잠긴 자물쇠에 TakeDamage 전달
+        ///         자물쇠 없으면 EnemyBase 정상 피격
         /// </summary>
         public new void TakeDamage(DamageInfo info)
         {
-            // ① 자물쇠 해제 완료 → 정상 피격
-            if (_isLockUnlocked)
+            // ① 모든 자물쇠 해제 완료 → 정상 피격
+            if (_isAllLocksUnlocked)
             {
                 base.TakeDamage(info);
                 return;
@@ -165,24 +180,25 @@ namespace KEY
                 return;
             }
 
-            // ③ 정면 공격 → 방패 완전 무효 (반응 없음)
+            // ③ 정면 공격 → 방패 완전 무효
             if (IsFrontalAttack(info.Direction))
             {
-                // 아무 반응 없음 — 방패가 공격을 완전히 흡수
-                // 플래시나 피격 효과 없이 조용히 무시
                 Debug.Log("[EnemyKnight] 정면 방패 → 공격 무효");
                 return;
             }
 
-            // ④ 후면 공격 → 자물쇠 피격
-            if (_backLock != null)
+            // ④ 후면 공격 → 첫 번째 잠긴 자물쇠에 전달
+            LockComponent targetLock = GetFirstLockedLock();
+
+            if (targetLock != null)
             {
-                Debug.Log("[EnemyKnight] 후면 공격 → 자물쇠 피격");
-                _backLock.TakeDamage(info);
+                Debug.Log($"[EnemyKnight] 후면 공격 → 자물쇠 피격 " +
+                          $"({_locks.IndexOf(targetLock) + 1}/{_locks.Count})");
+                targetLock.TakeDamage(info);
             }
             else
             {
-                // 자물쇠 없는 기사 — 후면 공격은 정상 피격
+                // 자물쇠 없는 상태 — 후면 공격 정상 피격
                 Debug.Log("[EnemyKnight] 후면 공격 → 자물쇠 없음, 정상 피격");
                 base.TakeDamage(info);
             }
@@ -193,17 +209,19 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 자물쇠 해제 완료 수신.
-        /// 이후 TakeDamage 는 EnemyBase 로 정상 처리됨.
+        /// 개별 자물쇠 해제 완료 수신.
+        /// 전부 해제되면 _isAllLocksUnlocked = true → 약점 노출.
         /// </summary>
         private void HandleLockUnlocked()
         {
-            _isLockUnlocked = true;
-            Debug.Log("[EnemyKnight] 자물쇠 해제 완료 → 약점 노출!");
+            _unlockedCount++;
+            Debug.Log($"[EnemyKnight] 자물쇠 해제 {_unlockedCount}/{_locks.Count}");
 
-            // 색상으로 약점 노출 피드백
-            if (_spriteRenderer != null)
-                _spriteRenderer.color = new Color(1f, 0.4f, 0.4f, 1f);
+            if (CheckAllUnlocked())
+            {
+                _isAllLocksUnlocked = true;
+                OnAllLocksUnlocked();
+            }
         }
 
         private void HandleLockHit(int current, int required)
@@ -212,31 +230,68 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // EnemyBase override
-        // ══════════════════════════════════════════════════════
-
-        protected override void OnDamaged(DamageInfo info) { }
-
-        // ══════════════════════════════════════════════════════
-        // 내부 — 정면/후면 판단
+        // 해제 조건 판별
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 공격 방향이 기사 정면 방향과 반대인지 판단.
+        /// 전부 해제 조건 확인.
         ///
-        /// [판단 공식]
-        ///   dot(기사_바라보는방향, 공격_방향) &lt; 0 → 정면 공격
-        ///
-        /// [예시]
-        ///   기사가 오른쪽(+1) 을 바라볼 때
-        ///   공격 방향이 왼쪽(-1) → dot = (+1)×(-1) = -1 &lt; 0 → 정면 공격 (방패에 막힘)
-        ///   공격 방향이 오른쪽(+1) → dot = (+1)×(+1) = 1 > 0 → 후면 공격 (자물쇠 피격)
+        /// [추후 확장 포인트]
+        ///   - 일부 해제 조건: _unlockedCount >= requiredCount
+        ///   - 속성 조건: 특정 타입 자물쇠만 해제 여부 체크
+        ///   이 메서드만 수정하면 전체 해제 조건 변경 가능.
+        /// </summary>
+        private bool CheckAllUnlocked()
+        {
+            if (_locks.Count == 0) return true;
+            return _unlockedCount >= _locks.Count;
+        }
+
+        /// <summary>
+        /// 모든 자물쇠 해제 완료 처리.
+        /// 색상 변경으로 약점 노출 피드백.
+        /// </summary>
+        private void OnAllLocksUnlocked()
+        {
+            Debug.Log("[EnemyKnight] 모든 자물쇠 해제 → 약점 노출!");
+
+            if (_spriteRenderer != null)
+                _spriteRenderer.color = new Color(1f, 0.4f, 0.4f, 1f);
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 보조
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 리스트에서 아직 잠긴 첫 번째 자물쇠 반환.
+        /// 순서 = Inspector 에서 설정한 우선순위.
+        /// 모두 해제됐으면 null 반환.
+        /// </summary>
+        private LockComponent GetFirstLockedLock()
+        {
+            foreach (var lock_ in _locks)
+            {
+                if (lock_ != null && !lock_.IsUnlocked)
+                    return lock_;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 공격 방향이 기사 정면과 반대인지 판단.
+        /// dot(기사방향, 공격방향) &lt; 0 → 정면 공격.
         /// </summary>
         private bool IsFrontalAttack(Vector2 attackDir)
         {
             float facingDir = _enemyAI != null ? _enemyAI.FacingDirection : 1f;
-            float dot = facingDir * attackDir.x;
-            return dot < 0f;
+            return facingDir * attackDir.x < 0f;
         }
+
+        // ══════════════════════════════════════════════════════
+        // EnemyBase override
+        // ══════════════════════════════════════════════════════
+
+        protected override void OnDamaged(DamageInfo info) { }
     }
 }

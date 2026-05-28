@@ -954,7 +954,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemyKnight
   _settings: {fileID: 11400000, guid: 1aa05cf20226fd9458604b10299a7971, type: 2}
-  _backLock: {fileID: 617885652}
+  _locks:
+  - {fileID: 617885652}
 --- !u!114 &375924249
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10215,7 +10216,7 @@ GameObject:
   - component: {fileID: 1703217643}
   - component: {fileID: 1703217642}
   - component: {fileID: 1703217639}
-  m_Layer: 10
+  m_Layer: 0
   m_Name: Weapon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -10319,7 +10320,7 @@ MonoBehaviour:
   - {fileID: 1054184072}
   _hitLayer:
     serializedVersion: 2
-    m_Bits: 32768
+    m_Bits: 163840
 --- !u!114 &1703217640
 MonoBehaviour:
   m_ObjectHideFlags: 0
