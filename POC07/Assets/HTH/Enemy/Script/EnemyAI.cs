@@ -1,35 +1,34 @@
 ﻿// ============================================================
-// EnemyAI.cs  v4.2
-// 적 공용 AI — ChargeAttack FlipHitbox 추가 + 상태전환 딜레이
+// EnemyAI.cs  v4.4
+// 적 공용 AI — Groggy 상태 + OnFlipped 이벤트 방식으로 Flip 분리
 //
-// [v4.2 변경]
-//   ① FlipAttackHitboxes() 에 EnemyKnightChargeAttack.FlipHitbox() 추가.
-//       방향 전환 시 돌진 히트박스 localPosition.x 도 반전.
+// [v4.4 변경]
+//   ① FlipAttackHitboxes() 제거 → OnFlipped 이벤트 발행으로 교체
+//       EnemyAI 가 Attack 스크립트를 직접 참조하던 구조 제거.
+//       Flip() / UpdateChaseDirection() / TurnTowardPlayer() 에서
+//       OnFlipped 이벤트만 발행.
+//       각 Attack 스크립트(EnemyKnightAttack, EnemyKnightChargeAttack)가
+//       Start() 에서 OnFlipped 를 구독해 자체 히트박스 반전 처리.
+//       → 추후 어떤 Enemy 든 Attack 스크립트가 늘어나도 EnemyAI 수정 불필요.
 //
-//   ② 상태전환 딜레이 추가 — 적이 둔하게 반응.
-//       Chase → Attack 전환 시 _stateTransitionDelay 만큼 대기.
-//       Attack → Chase 전환 시도 시에도 딜레이 적용.
-//       EnemyDataSO 에 stateTransitionDelay 필드 추가.
-//       딜레이 중 추가 전환 요청 무시 (_isTransitioning 플래그).
+//   ② ChangeState() 딜레이 제거
+//       stateTransitionDelay 필드가 EnemyDataSO 에 없음.
+//       groggyDuration 을 딜레이로 쓰던 잘못된 참조 제거.
+//       상태 전환은 즉시 처리. Groggy 상태가 경직을 담당.
 //
-// [v4.1 변경]
-//   _chargeAttack 구독, FlipAttackHitboxes(), 중복 진입 차단.
-//
-// [v4.0 변경]
-//   DataSO 단일 연결 지점 — EnemyBase.Settings 취득.
+// [v4.3 변경]
+//   Groggy 상태 추가. EnterGroggy() 외부 API.
 //
 // [네임스페이스]
 //   namespace : KEY
 // ============================================================
 
+using System;
 using System.Collections;
 using UnityEngine;
 
 namespace KEY
 {
-    /// <summary>
-    /// 적 공용 AI 컴포넌트. (v4.2)
-    /// </summary>
     [RequireComponent(typeof(EnemySensor))]
     public class EnemyAI : MonoBehaviour
     {
@@ -43,21 +42,19 @@ namespace KEY
             Idle,
             Chase,
             Attack,
+            /// <summary>
+            /// 그로기 — 완전 정지 + 플레이어 공략 타이밍.
+            /// 돌진 벽 충돌 or 봉인 취소 후 진입.
+            /// groggyDuration 후 Chase 복귀.
+            /// </summary>
+            Groggy,
         }
 
         // ──────────────────────────────────────────
-        // DataSO — Inspector 연결 없음
+        // DataSO
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 적 수치 SO. Awake 에서 EnemyBase.Settings 로 취득.
-        /// </summary>
         private EnemyDataSO _settings;
-
-        /// <summary>
-        /// 차징 돌진 공격 컴포넌트.
-        /// Awake 에서 자동 취득.
-        /// </summary>
         private EnemyKnightChargeAttack _chargeAttack;
 
         // ──────────────────────────────────────────
@@ -77,23 +74,26 @@ namespace KEY
         private AIState _currentState = AIState.Patrol;
         private float _facingDirection = 1f;
         private Coroutine _idleCoroutine;
+        private Coroutine _groggyCoroutine;
+
+        // ──────────────────────────────────────────
+        // 이벤트
+        // ──────────────────────────────────────────
 
         /// <summary>
-        /// 상태전환 딜레이 진행 중 플래그.
-        /// true 동안 ChangeState() 요청 무시 — 적이 즉각 반응하지 않고 둔하게 동작.
+        /// 방향 전환 시 발행.
+        /// 파라미터: 새 방향 (+1 = 오른쪽, -1 = 왼쪽).
+        /// EnemyKnightAttack / EnemyKnightChargeAttack 이 구독해
+        /// 각자 히트박스 localPosition.x 반전 처리.
+        /// EnemyAI 는 어떤 Attack 스크립트가 있는지 알 필요 없음.
         /// </summary>
-        private bool _isTransitioning;
-
-        private Coroutine _transitionCoroutine;
+        public event Action<float> OnFlipped;
 
         // ──────────────────────────────────────────
         // 프로퍼티
         // ──────────────────────────────────────────
 
-        /// <summary> 현재 AI 상태. </summary>
         public AIState CurrentState => _currentState;
-
-        /// <summary> 현재 바라보는 방향. 1 = 오른쪽, -1 = 왼쪽. </summary>
         public float FacingDirection => _facingDirection;
 
         // ══════════════════════════════════════════════════════
@@ -108,15 +108,12 @@ namespace KEY
             _sealComponent = GetComponent<EnemySealComponent>();
             _chargeAttack = GetComponent<EnemyKnightChargeAttack>();
 
-            // EnemyKnightAttack 만 명시 취득 (ChargeAttack 겹침 방지)
             _attack = GetComponent<EnemyKnightAttack>() as EnemyAttackBase
                       ?? GetComponent<EnemyAttackBase>();
 
             var enemyBase = GetComponent<EnemyBase>();
-            if (enemyBase != null)
-                _settings = enemyBase.Settings;
-            else
-                Debug.LogError("[EnemyAI] EnemyBase 컴포넌트가 없습니다.");
+            if (enemyBase != null) _settings = enemyBase.Settings;
+            else Debug.LogError("[EnemyAI] EnemyBase 가 없습니다.");
         }
 
         private void Start()
@@ -135,8 +132,8 @@ namespace KEY
             if (knightAttack != null) knightAttack.SetData(_settings);
             if (_chargeAttack != null) _chargeAttack.SetData(_settings);
 
-            if (_attack != null) _attack.OnAttackFinished += HandleAttackFinished;
-            if (_chargeAttack != null) _chargeAttack.OnAttackFinished += HandleAttackFinished;
+            if (_attack != null) _attack.OnAttackFinished += HandleNormalAttackFinished;
+            if (_chargeAttack != null) _chargeAttack.OnAttackFinished += HandleChargeAttackFinished;
 
             if (_settings.enemyType == EnemyType.Dummy ||
                 _settings.enemyType == EnemyType.DummyLocked)
@@ -145,8 +142,8 @@ namespace KEY
 
         private void OnDestroy()
         {
-            if (_attack != null) _attack.OnAttackFinished -= HandleAttackFinished;
-            if (_chargeAttack != null) _chargeAttack.OnAttackFinished -= HandleAttackFinished;
+            if (_attack != null) _attack.OnAttackFinished -= HandleNormalAttackFinished;
+            if (_chargeAttack != null) _chargeAttack.OnAttackFinished -= HandleChargeAttackFinished;
         }
 
         private void Update() => UpdateState();
@@ -160,14 +157,33 @@ namespace KEY
             => _sealComponent != null && _sealComponent.IsSealedAction(sealType);
 
         // ══════════════════════════════════════════════════════
+        // 외부 API
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 그로기 상태 즉시 진입.
+        /// EnemyKnightChargeAttack 에서 호출:
+        ///   ① 돌진 중 벽 충돌
+        ///   ② 카운트다운 중 Dash 봉인 감지 → 취소
+        /// </summary>
+        public void EnterGroggy(float duration = -1f)
+        {
+            float t = duration > 0f
+                ? duration
+                : (_settings != null ? _settings.groggyDuration : 2.0f);
+
+            ApplyState(AIState.Groggy);
+
+            if (_groggyCoroutine != null) StopCoroutine(_groggyCoroutine);
+            _groggyCoroutine = StartCoroutine(GroggyRoutine(t));
+        }
+
+        // ══════════════════════════════════════════════════════
         // 상태 업데이트
         // ══════════════════════════════════════════════════════
 
         private void UpdateState()
         {
-            // 상태전환 딜레이 중 — 조건 확인 중단
-            if (_isTransitioning) return;
-
             switch (_currentState)
             {
                 case AIState.Patrol:
@@ -177,8 +193,7 @@ namespace KEY
                         TryEnterIdle();
                         return;
                     }
-                    if (_sensor.CheckPatrolSight())
-                        ChangeState(AIState.Chase);
+                    if (_sensor.CheckPatrolSight()) ChangeState(AIState.Chase);
                     break;
 
                 case AIState.Idle:
@@ -190,26 +205,27 @@ namespace KEY
                     break;
 
                 case AIState.Chase:
-                    if (!_sensor.CheckChaseRange())
-                    {
-                        ChangeState(AIState.Patrol);
-                        return;
-                    }
-                    if (_chargeAttack != null && _chargeAttack.CanAttack
-                        && _sensor.CheckChargeRange())
-                    {
+                    if (!_sensor.CheckChaseRange()) { ChangeState(AIState.Patrol); return; }
+
+                    bool inChargeRange = _sensor.CheckChargeRange();
+                    bool chargeReady = _chargeAttack != null && _chargeAttack.CanAttack;
+                    bool inAttackRange = _sensor.CheckAttackRange();
+                    bool normalReady = _attack != null && _attack.CanAttack;
+
+                    if (chargeReady && inChargeRange && !inAttackRange)
                         ChangeState(AIState.Attack);
-                        return;
-                    }
-                    if (_sensor.CheckAttackRange() && _attack != null && _attack.CanAttack)
-                    {
+                    else if (normalReady && inAttackRange)
                         ChangeState(AIState.Attack);
-                        return;
-                    }
-                    UpdateChaseDirection();
+                    else if (chargeReady && inChargeRange)
+                        ChangeState(AIState.Attack);
+                    else
+                        UpdateChaseDirection();
                     break;
 
                 case AIState.Attack:
+                    break;
+
+                case AIState.Groggy:
                     break;
             }
         }
@@ -222,6 +238,7 @@ namespace KEY
                 case AIState.Chase: OnChaseMove(); break;
                 case AIState.Idle:
                 case AIState.Attack:
+                case AIState.Groggy:
                     StopHorizontal();
                     break;
             }
@@ -238,7 +255,6 @@ namespace KEY
                 StopHorizontal();
                 return;
             }
-
             switch (_settings.enemyType)
             {
                 case EnemyType.Knight:
@@ -256,7 +272,6 @@ namespace KEY
                 StopHorizontal();
                 return;
             }
-
             switch (_settings.enemyType)
             {
                 case EnemyType.Knight:
@@ -271,17 +286,12 @@ namespace KEY
         {
             StopHorizontal();
 
-            if (IsSealed(SealType.Attack))
-            {
-                ChangeState(AIState.Chase);
-                return;
-            }
+            bool attackBusy = _attack != null && _attack.IsAttacking;
+            bool chargeBusy = _chargeAttack != null && _chargeAttack.IsAttacking;
+            if (attackBusy || chargeBusy) return;
 
-            if (_attack == null)
-            {
-                ChangeState(AIState.Chase);
-                return;
-            }
+            if (IsSealed(SealType.Attack)) { ChangeState(AIState.Chase); return; }
+            if (_attack == null) { ChangeState(AIState.Chase); return; }
 
             switch (_settings.enemyType)
             {
@@ -292,24 +302,13 @@ namespace KEY
                     bool normalReady = _attack != null && _attack.CanAttack;
 
                     if (chargeReady && inChargeRange && !inAttackRange)
-                    {
                         _chargeAttack.TryAttack(_settings.chargeCooldown);
-                        Debug.Log("[EnemyAI] Knight 차징 돌진");
-                    }
                     else if (normalReady && inAttackRange)
-                    {
                         _attack.TryAttack(_settings.attackCooldown);
-                        Debug.Log("[EnemyAI] Knight 근접 공격");
-                    }
                     else if (chargeReady && inChargeRange)
-                    {
                         _chargeAttack.TryAttack(_settings.chargeCooldown);
-                        Debug.Log("[EnemyAI] Knight 차징 돌진 (근접 내)");
-                    }
                     else
-                    {
                         ChangeState(AIState.Chase);
-                    }
                     break;
 
                 default:
@@ -322,62 +321,66 @@ namespace KEY
         // 이벤트 핸들러
         // ══════════════════════════════════════════════════════
 
-        private void HandleAttackFinished() => ChangeState(AIState.Chase);
+        /// <summary>
+        /// 근접 공격 완료 → 짧은 Groggy (groggyDuration × 0.4) → Chase.
+        /// </summary>
+        private void HandleNormalAttackFinished()
+        {
+            float t = (_settings != null ? _settings.groggyDuration : 2.0f) * 0.4f;
+            EnterGroggy(t);
+        }
+
+        /// <summary>
+        /// 차징 공격 정상 완료 → 기본 Groggy → Chase.
+        /// 벽 충돌 시에는 EnemyKnightChargeAttack 이 직접 EnterGroggy() 호출.
+        /// </summary>
+        private void HandleChargeAttackFinished()
+        {
+            EnterGroggy();
+        }
+
+        // ══════════════════════════════════════════════════════
+        // Groggy 코루틴
+        // ══════════════════════════════════════════════════════
+
+        private IEnumerator GroggyRoutine(float duration)
+        {
+            Debug.Log($"[EnemyAI] Groggy 진입 ({duration:F1}초)");
+            StopHorizontal();
+
+            yield return new WaitForSeconds(duration);
+
+            TurnTowardPlayer();
+
+            _groggyCoroutine = null;
+            Debug.Log("[EnemyAI] Groggy 종료 → Chase 복귀");
+            ApplyState(AIState.Chase);
+        }
+
+        /// <summary>
+        /// 플레이어 방향으로 즉시 전환. Groggy 종료 시 호출.
+        /// </summary>
+        private void TurnTowardPlayer()
+        {
+            Transform player = _sensor.DetectedPlayer;
+            if (player == null) return;
+
+            float dir = player.position.x > transform.position.x ? 1f : -1f;
+            if (Mathf.Approximately(dir, _facingDirection)) return;
+
+            SetFacing(dir);
+        }
 
         // ══════════════════════════════════════════════════════
         // 상태 전환
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 상태 전환 요청.
-        /// stateTransitionDelay > 0 이면 딜레이 후 전환 — 적이 둔하게 반응.
-        /// 딜레이 중 요청은 무시 (_isTransitioning).
-        ///
-        /// [딜레이 적용 전환]
-        ///   Chase → Attack : 공격 결정에 딜레이 (둔한 반응)
-        ///   Attack → Chase : 공격 후 추격 복귀에 딜레이 (잠깐 멈춤)
-        ///
-        /// [즉시 전환]
-        ///   Patrol ↔ Idle  : 순찰/대기 전환은 즉시 (딜레이 불필요)
-        ///   Chase → Patrol : 범위 이탈 즉시 복귀
-        /// </summary>
         private void ChangeState(AIState newState)
         {
             if (_currentState == newState) return;
-            if (_isTransitioning) return;
-
-            // 딜레이 적용 전환 (Chase↔Attack)
-            float delay = _settings != null ? _settings.stateTransitionDelay : 0f;
-            bool useDelay = delay > 0f &&
-                           ((_currentState == AIState.Chase && newState == AIState.Attack) ||
-                            (_currentState == AIState.Attack && newState == AIState.Chase));
-
-            if (useDelay)
-            {
-                if (_transitionCoroutine != null) StopCoroutine(_transitionCoroutine);
-                _transitionCoroutine = StartCoroutine(DelayedTransition(newState, delay));
-                return;
-            }
-
             ApplyState(newState);
         }
 
-        /// <summary>
-        /// 딜레이 후 상태 전환 코루틴.
-        /// 딜레이 중 이동은 유지 (멈추지 않음 — 어색한 정지 방지).
-        /// </summary>
-        private IEnumerator DelayedTransition(AIState newState, float delay)
-        {
-            _isTransitioning = true;
-            yield return new WaitForSeconds(delay);
-            _isTransitioning = false;
-            ApplyState(newState);
-        }
-
-        /// <summary>
-        /// 실제 상태 적용.
-        /// ChangeState 와 DelayedTransition 양쪽에서 호출.
-        /// </summary>
         private void ApplyState(AIState newState)
         {
             if (_currentState == newState) return;
@@ -392,45 +395,25 @@ namespace KEY
                 case AIState.Attack:
                     OnEnterAttack();
                     break;
+                case AIState.Groggy:
+                    StopHorizontal();
+                    break;
             }
         }
 
         private void TryEnterIdle()
         {
-            if (Random.value < _settings.idleChance)
+            if (UnityEngine.Random.value < _settings.idleChance)
                 ChangeState(AIState.Idle);
         }
 
         // ══════════════════════════════════════════════════════
-        // 이동 보조
+        // 이동 / 방향
         // ══════════════════════════════════════════════════════
 
         private void Flip()
         {
-            _facingDirection *= -1f;
-            if (_spriteRenderer != null)
-                _spriteRenderer.flipX = _facingDirection < 0f;
-            _sensor.SetFacingDirection(_facingDirection);
-            FlipAttackHitboxes(_facingDirection);
-        }
-
-        /// <summary>
-        /// 방향 전환 시 모든 공격 히트박스 localPosition.x 반전.
-        ///
-        /// [v4.2 변경]
-        ///   EnemyKnightAttack.FlipHitbox()       — 근접 히트박스
-        ///   EnemyKnightChargeAttack.FlipHitbox() — 돌진 히트박스 ← 추가
-        /// </summary>
-        private void FlipAttackHitboxes(float dir)
-        {
-            // 근접 히트박스 반전
-            var knightAttack = GetComponent<EnemyKnightAttack>();
-            if (knightAttack != null)
-                knightAttack.FlipHitbox(dir);
-
-            // 돌진 히트박스 반전 (v4.2 추가)
-            if (_chargeAttack != null)
-                _chargeAttack.FlipHitbox(dir);
+            SetFacing(_facingDirection * -1f);
         }
 
         private void UpdateChaseDirection()
@@ -439,13 +422,23 @@ namespace KEY
             if (player == null) return;
 
             float dir = player.position.x > transform.position.x ? 1f : -1f;
-            if (!Mathf.Approximately(dir, _facingDirection))
-            {
-                _facingDirection = dir;
-                _spriteRenderer.flipX = dir < 0f;
-                _sensor.SetFacingDirection(dir);
-                FlipAttackHitboxes(dir);
-            }
+            if (Mathf.Approximately(dir, _facingDirection)) return;
+
+            SetFacing(dir);
+        }
+
+        /// <summary>
+        /// 방향 설정 + SpriteRenderer 반전 + Sensor 갱신 + OnFlipped 이벤트 발행.
+        /// Flip / UpdateChaseDirection / TurnTowardPlayer 모두 이 함수를 통함.
+        /// Attack 스크립트들은 OnFlipped 를 구독해 자체 히트박스를 반전.
+        /// </summary>
+        private void SetFacing(float dir)
+        {
+            _facingDirection = dir;
+            if (_spriteRenderer != null)
+                _spriteRenderer.flipX = _facingDirection < 0f;
+            _sensor.SetFacingDirection(_facingDirection);
+            OnFlipped?.Invoke(_facingDirection);
         }
 
         private void StopHorizontal()
@@ -460,9 +453,24 @@ namespace KEY
 
         private IEnumerator IdleRoutine()
         {
-            float idleTime = Random.Range(_settings.idleTimeMin, _settings.idleTimeMax);
-            yield return new WaitForSeconds(idleTime);
+            float t = UnityEngine.Random.Range(_settings.idleTimeMin, _settings.idleTimeMax);
+            yield return new WaitForSeconds(t);
             ChangeState(AIState.Patrol);
         }
+
+        // ══════════════════════════════════════════════════════
+        // Gizmos
+        // ══════════════════════════════════════════════════════
+
+#if UNITY_EDITOR
+        private void OnDrawGizmosSelected()
+        {
+            if (_sealComponent == null || !_sealComponent.HasAnySeal) return;
+            UnityEditor.Handles.color = Color.cyan;
+            UnityEditor.Handles.Label(
+                transform.position + Vector3.up * 2.5f,
+                $"[AI봉인] {_sealComponent.SealCount}개");
+        }
+#endif
     }
 }

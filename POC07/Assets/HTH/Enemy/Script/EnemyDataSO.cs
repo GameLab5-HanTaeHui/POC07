@@ -1,17 +1,22 @@
 ﻿// ============================================================
-// EnemyDataSO.cs  v2.2
-// 적 수치 설정 ScriptableObject
-//
-// [v2.2 변경]
-//   stateTransitionDelay 추가.
-//     EnemyAI 상태전환 딜레이 (Chase↔Attack).
-//     클수록 적이 둔하게 반응. 0 = 즉각 전환.
+// EnemyDataSO.cs  v2.1
+// 적 수치 설정 ScriptableObject — attackHitLayer + 차징 수치 추가
 //
 // [v2.1 변경]
-//   attackHitLayer 추가 — 공격 히트박스 감지 전용 레이어.
-//   차징 돌진 수치 섹션 추가 (EnemyKnightChargeAttack 용).
-//   chargeWindupTime / chargeSpeed / chargeDuration /
-//   chargeDamage / chargeKnockbackMultiplier / chargeCooldown / chargeDetectRange
+//   attackHitLayer 추가
+//     - EnemyKnightAttack.CheckHit() 에서 플레이어 감지 레이어.
+//     - 기존: EnemyDataSO.playerLayer (이동/감지용) 을 공격 판정에도 사용.
+//     - 변경: attackHitLayer 를 공격 판정 전용으로 분리.
+//     - 설정값: Player 레이어 선택.
+//     - [배경] playerLayer 는 EnemySensor 의 플레이어 탐지용.
+//       공격 히트박스 감지는 별도 레이어로 명확히 분리.
+//
+//   차징 돌진 수치 섹션 추가 (EnemyKnightChargeAttack 용)
+//     - chargeWindupTime  : 돌진 준비(경고) 시간
+//     - chargeSpeed       : 돌진 속도
+//     - chargeDuration    : 돌진 지속 시간
+//     - chargeDamage      : 돌진 피해량
+//     - chargeKnockback   : 돌진 넉백 배율
 //
 // [v2.0 변경]
 //   KnightDataSO 제거 → 전 타입 수치 통합.
@@ -39,7 +44,7 @@ namespace KEY
     }
 
     /// <summary>
-    /// 적 전 타입 수치 통합 ScriptableObject. (v2.2)
+    /// 적 전 타입 수치 통합 ScriptableObject. (v2.1)
     /// </summary>
     [CreateAssetMenu(fileName = "EnemyData", menuName = "KEY/Enemy Data", order = 10)]
     public class EnemyDataSO : ScriptableObject
@@ -157,63 +162,84 @@ namespace KEY
         [SerializeField] public float attackDuration = 0.3f;
 
         // ──────────────────────────────────────────
-        // 차징 돌진 (EnemyKnightChargeAttack 용) — v2.1
+        // 차징 돌진 (EnemyKnightChargeAttack 용)
         // ──────────────────────────────────────────
 
         [Header("── 차징 돌진 (Knight 전용) ──────────────────────")]
 
-        /// <summary> 돌진 준비(경고) 시간 (초). </summary>
+        /// <summary>
+        /// 돌진 준비(경고) 시간 (초).
+        /// 이 시간 동안 적이 멈추고 경고 모션 / 이펙트 재생.
+        /// </summary>
         [Tooltip("돌진 전 준비 시간 (초). 경고 모션 재생 구간. 권장: 0.5~1.0.")]
         [Min(0f)]
         [SerializeField] public float chargeWindupTime = 0.6f;
 
-        /// <summary> 돌진 속도 (units/s). </summary>
+        /// <summary>
+        /// 돌진 속도 (units/s).
+        /// 일반 추격 속도보다 훨씬 빨라야 위협감이 있음.
+        /// </summary>
         [Tooltip("돌진 속도 (units/s). 권장: 10~18.")]
         [Min(1f)]
         [SerializeField] public float chargeSpeed = 14f;
 
-        /// <summary> 돌진 최대 지속 시간 (초). </summary>
+        /// <summary>
+        /// 돌진 최대 지속 시간 (초).
+        /// 벽/낭떠러지 충돌 or 이 시간 초과 시 돌진 종료.
+        /// </summary>
         [Tooltip("돌진 최대 지속 시간 (초). 권장: 0.6~1.2.")]
         [Min(0.1f)]
         [SerializeField] public float chargeDuration = 0.8f;
 
-        /// <summary> 돌진 피해량. </summary>
+        /// <summary>
+        /// 돌진 피해량.
+        /// 일반 공격보다 크게 설정 권장 (리스크 큰 공격).
+        /// </summary>
         [Tooltip("돌진 피해량. 권장: attackDamage × 1.5~2.0.")]
         [Min(0f)]
         [SerializeField] public float chargeDamage = 25f;
 
-        /// <summary> 돌진 넉백 배율. knockbackForce × 이 값. </summary>
+        /// <summary>
+        /// 돌진 넉백 배율.
+        /// 일반 knockbackForce 에 이 값을 곱해 강한 넉백 부여.
+        /// </summary>
         [Tooltip("돌진 넉백 배율. knockbackForce × 이 값. 권장: 1.5~2.5.")]
         [Min(0f)]
         [SerializeField] public float chargeKnockbackMultiplier = 2.0f;
 
-        /// <summary> 돌진 쿨타임 (초). </summary>
+        /// <summary>
+        /// 돌진 쿨타임 (초).
+        /// 일반 공격 쿨타임보다 길게 설정.
+        /// </summary>
         [Tooltip("돌진 쿨타임 (초). 권장: 4~8.")]
         [Min(0.1f)]
         [SerializeField] public float chargeCooldown = 5.0f;
 
+        // ──────────────────────────────────────────
+        // 그로기 (EnemyAI.Groggy 상태 전용)
+        // ──────────────────────────────────────────
+
+        [Header("── 그로기 ──────────────────────")]
+
         /// <summary>
-        /// 차징 발동 감지 범위 (units).
-        /// attackRange < 이 값 < chaseSightRadius.
+        /// 그로기 지속 시간 (초).
+        /// 돌진 벽 충돌 or 봉인으로 돌진 취소 시 진입.
+        /// 이 시간 동안 완전 정지 — 플레이어가 Lock 을 공격할 타이밍.
+        /// 권장: 2.0~3.5
+        /// </summary>
+        [Tooltip("그로기 지속 시간 (초). 돌진 충돌/취소 후 완전 정지 구간. 권장: 2.0~3.5.")]
+        [Min(0.5f)]
+        [SerializeField] public float groggyDuration = 2.5f;
+
+        /// <summary>
+        /// 차징 발동 감지 범위 반경 (units). (v1.1 추가)
+        /// EnemySensor.CheckChargeRange() 에서 사용.
+        /// attackRange 보다 크고 chaseSightRadius 보다 작게 설정.
+        /// 이 범위 안에 플레이어가 있고 차징 쿨타임이 끝나면 차징 공격 선택.
         /// </summary>
         [Tooltip("차징 발동 감지 범위. attackRange < 이 값 < chaseSightRadius. 권장: 4~7.")]
         [Min(0.1f)]
         [SerializeField] public float chargeDetectRange = 5.0f;
-
-        // ──────────────────────────────────────────
-        // AI 상태전환 — v2.2
-        // ──────────────────────────────────────────
-
-        [Header("── AI 상태전환 ──────────────────────")]
-
-        /// <summary>
-        /// Chase → Attack / Attack → Chase 전환 딜레이 (초).
-        /// 클수록 적이 둔하게 반응. 0 = 즉각 전환.
-        /// Patrol ↔ Idle 전환에는 적용하지 않음.
-        /// </summary>
-        [Tooltip("Chase↔Attack 전환 딜레이 (초). 클수록 둔하게 반응. 0 = 즉각 전환. 권장: 0.3~0.8.")]
-        [Range(0f, 2f)]
-        [SerializeField] public float stateTransitionDelay = 0.4f;
 
         // ──────────────────────────────────────────
         // 레이어
@@ -221,21 +247,34 @@ namespace KEY
 
         [Header("── 레이어 ──────────────────────")]
 
-        /// <summary> 플레이어 탐지 레이어. EnemySensor 전용. </summary>
+        /// <summary>
+        /// 플레이어 탐지 레이어.
+        /// EnemySensor 의 Raycast / OverlapCircle 감지 대상.
+        /// 설정값: Player 레이어.
+        /// </summary>
         [Tooltip("플레이어 탐지 레이어. EnemySensor 전용. Player 레이어 선택.")]
         [SerializeField] public LayerMask playerLayer;
 
-        /// <summary> 지형 레이어. EnemySensor 벽/낭떠러지/지면 감지. </summary>
+        /// <summary>
+        /// 지형 레이어.
+        /// EnemySensor 의 벽/낭떠러지/지면 감지 대상.
+        /// 설정값: Ground 레이어.
+        /// </summary>
         [Tooltip("지형 레이어. EnemySensor 감지용. Ground 레이어 선택.")]
         [SerializeField] public LayerMask groundLayer;
 
         /// <summary>
-        /// 공격 히트박스 감지 레이어. (v2.1)
-        /// EnemyKnightAttack.CheckHit() / ChargeAttack.CheckChargeHitPlayer() 전용.
-        /// Physics 2D Matrix: EnemyAttackHit ↔ Player 충돌 ON 필요.
+        /// 공격 히트박스 감지 레이어. (v2.1 추가)
+        /// EnemyKnightAttack.CheckHit() 에서 플레이어 콜라이더 감지.
+        /// 설정값: Player 레이어.
+        ///
+        /// [playerLayer 와의 차이]
+        ///   playerLayer   : EnemySensor 전용 — Raycast 탐지
+        ///   attackHitLayer: 공격 히트박스 전용 — OverlapCollider 감지
+        ///   Physics 2D Matrix: EnemyAttackHit ↔ Player 충돌 ON 필요.
         /// </summary>
         [Tooltip("공격 히트박스 감지 레이어. Player 레이어 선택. " +
-                 "Physics 2D Matrix EnemyAttackHit ↔ Player 충돌 ON 필요.")]
+                 "Physics 2D Matrix 에서 EnemyAttackHit ↔ Player 충돌 ON 필요.")]
         [SerializeField] public LayerMask attackHitLayer;
     }
 }

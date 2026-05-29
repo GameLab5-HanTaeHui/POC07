@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// EnemyKnightAttack.cs  v1.2
+// EnemyKnightAttack.cs  v1.3
 // 기사형 근접 내려치기 — attackHitLayer 적용 + GC 방지
 //
 // [v1.2 변경]
@@ -36,7 +36,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 기사형 근접 내려치기 공격. (v1.2)
+    /// 기사형 근접 내려치기 공격. (v1.3)
     ///
     /// ────────────────────────────────────────────────────
     /// [공격 흐름]
@@ -81,16 +81,6 @@ namespace KEY
         private EnemyAI _enemyAI;
 
         // ──────────────────────────────────────────
-        // 히트박스 방향 캐시
-        // ──────────────────────────────────────────
-
-        /// <summary>
-        /// 히트박스 초기 localPosition.x 절댓값.
-        /// Awake 에서 캐싱. FlipHitbox 에서 방향 × 이 값으로 반전.
-        /// </summary>
-        private float _originalHitboxLocalX;
-
-        // ──────────────────────────────────────────
         // GC 방지 버퍼
         // ──────────────────────────────────────────
 
@@ -119,12 +109,7 @@ namespace KEY
                 _hitbox = GetComponentInChildren<Collider2D>();
 
             if (_hitbox != null)
-            {
-                // 초기 localPosition.x 절댓값 캐싱 (방향 반전에 사용)
-                _originalHitboxLocalX = Mathf.Abs(_hitbox.transform.localPosition.x);
-                // 비전투 시 항상 비활성
                 _hitbox.enabled = false;
-            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -135,22 +120,6 @@ namespace KEY
         /// EnemyDataSO 주입. EnemyAI.Start() 에서 호출.
         /// </summary>
         public void SetData(EnemyDataSO data) => _data = data;
-
-        // ══════════════════════════════════════════════════════
-        // 외부 API
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// 히트박스 localPosition.x 를 방향에 맞게 반전.
-        /// EnemyAI.FlipAttackHitboxes() 에서 방향 전환 시 호출.
-        /// </summary>
-        public void FlipHitbox(float dir)
-        {
-            if (_hitbox == null) return;
-            Vector3 pos = _hitbox.transform.localPosition;
-            _hitbox.transform.localPosition = new Vector3(
-                _originalHitboxLocalX * dir, pos.y, pos.z);
-        }
 
         // ══════════════════════════════════════════════════════
         // EnemyAttackBase 구현

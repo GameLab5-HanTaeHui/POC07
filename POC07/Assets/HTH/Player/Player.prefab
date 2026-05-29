@@ -383,9 +383,12 @@ MonoBehaviour:
   - {fileID: 6872860393597472193}
   - {fileID: 7961816210524045552}
   - {fileID: 416952407377161030}
-  _hitLayer:
+  _enemyLayer:
     serializedVersion: 2
-    m_Bits: 163840
+    m_Bits: 32768
+  _lockLayer:
+    serializedVersion: 2
+    m_Bits: 131072
 --- !u!1 &4517407843543251923
 GameObject:
   m_ObjectHideFlags: 0
