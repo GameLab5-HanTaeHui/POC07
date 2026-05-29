@@ -122,17 +122,6 @@ namespace KEY
         private EnemySealComponent _sealComponent;
 
         // ──────────────────────────────────────────
-        // Shield Flip 캐시
-        // ──────────────────────────────────────────
-
-        /// <summary>
-        /// ShieldCollider 초기 localPosition.x 절댓값.
-        /// Awake 에서 캐싱.
-        /// FlipShield() 에서 방향 × 이 값으로 반전.
-        /// </summary>
-        private float _originalShieldLocalX;
-
-        // ──────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────
 
@@ -161,10 +150,6 @@ namespace KEY
 
             if (_locks.Count == 0)
                 Debug.LogWarning("[EnemyKnight] LockComponent 가 없습니다.");
-
-            // ShieldCollider 초기 localPosition.x 캐싱
-            if (_shieldCollider != null)
-                _originalShieldLocalX = Mathf.Abs(_shieldCollider.transform.localPosition.x);
         }
 
         private void Start()
@@ -176,11 +161,6 @@ namespace KEY
                 lock_.OnLockUnlocked += HandleLockUnlocked;
                 lock_.OnLockHit += HandleLockHit;
             }
-
-            // ShieldCollider Flip 연동 — EnemyAI.OnFlipped 구독
-            var enemyAI = GetComponent<EnemyAI>();
-            if (enemyAI != null)
-                enemyAI.OnFlipped += FlipShield;
         }
 
         private void OnDestroy()
@@ -191,36 +171,6 @@ namespace KEY
                 lock_.OnLockUnlocked -= HandleLockUnlocked;
                 lock_.OnLockHit -= HandleLockHit;
             }
-
-            var enemyAI = GetComponent<EnemyAI>();
-            if (enemyAI != null)
-                enemyAI.OnFlipped -= FlipShield;
-        }
-
-        // ══════════════════════════════════════════════════════
-        // ShieldCollider Flip
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// ShieldCollider localPosition.x 를 방향에 맞게 반전.
-        /// EnemyAI.OnFlipped 이벤트 수신 시 자동 호출.
-        ///
-        /// [동작]
-        ///   dir = +1 (오른쪽) → Shield localPosition.x = +_originalShieldLocalX (기사 정면 = 오른쪽)
-        ///   dir = -1 (왼쪽)  → Shield localPosition.x = -_originalShieldLocalX (기사 정면 = 왼쪽)
-        ///
-        /// [LockComponent.FlipPosition() 과의 관계]
-        ///   Shield 는 +dir (정면), Lock 은 -dir (후방) 방향에 위치.
-        ///   두 콜라이더가 항상 서로 반대편에 있도록 유지.
-        /// </summary>
-        private void FlipShield(float dir)
-        {
-            if (_shieldCollider == null) return;
-            Vector3 pos = _shieldCollider.transform.localPosition;
-            _shieldCollider.transform.localPosition = new Vector3(
-                _originalShieldLocalX * dir,
-                pos.y,
-                pos.z);
         }
 
         // ══════════════════════════════════════════════════════

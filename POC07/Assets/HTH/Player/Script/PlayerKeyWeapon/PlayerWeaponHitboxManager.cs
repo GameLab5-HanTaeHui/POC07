@@ -121,16 +121,6 @@ namespace KEY
         [SerializeField] private LayerMask _shieldLayer;
 
         // ──────────────────────────────────────────
-        // 히트박스 위치 캐시 (v1.1)
-        // ──────────────────────────────────────────
-
-        /// <summary>
-        /// 각 히트박스 초기 localPosition.
-        /// FlipHitboxes 에서 절댓값 + 방향 곱으로 반전 계산.
-        /// </summary>
-        private Vector3[] _HitBoxPosition;
-
-        // ──────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────
 
@@ -158,62 +148,13 @@ namespace KEY
                 return;
             }
 
-            CacheOriginalOffsets();
             DisableAllHitboxes();
-        }
-
-        private void Start()
-        {
-            var mover = GetComponentInParent<PlayerMover>();
-            if (mover != null)
-                mover.OnFlipped += FlipHitboxes;
-            else
-                Debug.LogWarning("[PlayerWeaponHitboxManager] PlayerMover 를 찾을 수 없습니다.");
-        }
-
-        private void OnDestroy()
-        {
-            var mover = GetComponentInParent<PlayerMover>();
-            if (mover != null)
-                mover.OnFlipped -= FlipHitboxes;
         }
 
         private void Update()
         {
             if (_activeHitboxIndex < 0) return;
             CheckHit(_hitboxes[_activeHitboxIndex]);
-        }
-
-        // ══════════════════════════════════════════════════════
-        // 히트박스 반전 (v1.1)
-        // ══════════════════════════════════════════════════════
-
-        private void FlipHitboxes(float newDir)
-        {
-            if (_hitboxes == null) return;
-            for (int i = 0; i < _hitboxes.Length; i++)
-            {
-                if (_hitboxes[i] == null) continue;
-
-                if (_hitboxes[i] is BoxCollider2D box)
-                {
-                    _HitBoxPosition[i] = new Vector3(
-                        Mathf.Abs(_HitBoxPosition[i].x) * newDir,
-                        _HitBoxPosition[i].y,
-                        _HitBoxPosition[i].z);
-                    box.transform.localPosition = _HitBoxPosition[i];
-                }
-            }
-        }
-
-        private void CacheOriginalOffsets()
-        {
-            _HitBoxPosition = new Vector3[_hitboxes.Length];
-            for (int i = 0; i < _hitboxes.Length; i++)
-            {
-                if (_hitboxes[i] is BoxCollider2D box)
-                    _HitBoxPosition[i] = box.gameObject.transform.localPosition;
-            }
         }
 
         // ══════════════════════════════════════════════════════

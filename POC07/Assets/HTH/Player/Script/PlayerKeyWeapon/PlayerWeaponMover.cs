@@ -79,11 +79,6 @@ namespace KEY
         private Coroutine _swingCoroutine;
 
         /// <summary>
-        /// 무기 오브젝트 스프라이트
-        /// </summary>
-        private SpriteRenderer _spriteRenderer;
-
-        /// <summary>
         /// Weapon 오브젝트의 로컬 원점 위치.
         /// Awake 에서 초기값 캐싱.
         /// OnFlipped 수신 시 X 부호가 반전됨.
@@ -114,26 +109,6 @@ namespace KEY
         private void Awake()
         {
             _originLocalPosition = transform.localPosition;
-            _spriteRenderer = GetComponent<SpriteRenderer>();
-        }
-
-        /// <summary>
-        /// Start 에서 PlayerMover 이벤트 구독.
-        /// Awake 순서 보장을 위해 Start 사용.
-        /// </summary>
-        private void Start()
-        {
-            var mover = GetComponentInParent<PlayerMover>();
-
-            if (mover != null)
-            {
-                mover.OnFlipped += HandleFlipped;
-            }
-            else
-            {
-                Debug.LogWarning("[PlayerWeaponMover] 부모에서 PlayerMover 를 찾을 수 없습니다. " +
-                                 "좌우 Weapon 동기화가 비활성화됩니다.");
-            }
         }
 
         /// <summary>
@@ -142,45 +117,6 @@ namespace KEY
         private void OnDestroy()
         {
             _swingTween?.Kill();
-
-            var mover = GetComponentInParent<PlayerMover>();
-            if (mover != null)
-                mover.OnFlipped -= HandleFlipped;
-        }
-
-        // ══════════════════════════════════════════════════════
-        // 이벤트 핸들러
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// PlayerMover.OnFlipped 수신 핸들러.
-        /// 방향 전환 시 _originLocalPosition.x 를 반전하고
-        /// 스윙 진행 중이면 즉시 취소 후 새 원점으로 이동.
-        ///
-        /// [처리 흐름]
-        ///   1. _originLocalPosition.x 를 newDir 부호로 교정
-        ///   2. 스윙 중이면 CancelSwing() → localPosition = _originLocalPosition
-        ///   3. 스윙 중이 아니면 localPosition 만 즉시 교정
-        /// </summary>
-        /// <param name="newDir">새 방향. 1 = 오른쪽, -1 = 왼쪽.</param>
-        private void HandleFlipped(float newDir)
-        {
-            // X 부호만 반전 (Y, Z 는 유지)
-            _originLocalPosition = new Vector3(Mathf.Abs(_originLocalPosition.x) * newDir,
-                _originLocalPosition.y, _originLocalPosition.z);
-            // 스프라이트 반전
-            _spriteRenderer.flipX = newDir > 0 ? false : true;
-
-            if (IsSwinging)
-            {
-                // 스윙 중이면 즉시 취소하고 새 원점으로 복귀
-                CancelSwing();
-            }
-            else
-            {
-                // 스윙 중이 아니면 현재 위치만 즉시 보정
-                transform.localPosition = _originLocalPosition;
-            }
         }
 
         // ══════════════════════════════════════════════════════
