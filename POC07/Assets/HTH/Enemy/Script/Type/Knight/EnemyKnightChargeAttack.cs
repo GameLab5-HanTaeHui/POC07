@@ -152,8 +152,6 @@ namespace KEY
             _enemyAI = GetComponent<EnemyAI>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
-            // ★ _chargeHitbox 는 자동 탐색 없음 — Inspector 에서만 연결
-            //    GetComponent 로 본체 콜라이더가 잡히면 벽 즉시 감지 버그 발생
 
             if (_lineRenderer != null)
             {
