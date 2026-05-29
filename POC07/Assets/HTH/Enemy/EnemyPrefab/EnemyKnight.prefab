@@ -15,9 +15,9 @@ GameObject:
   - component: {fileID: 7998307356327303282}
   - component: {fileID: 1363594226704711952}
   - component: {fileID: 8034309942722479110}
-  - component: {fileID: 3921563154337381813}
   - component: {fileID: 5275010070133413985}
   - component: {fileID: 4563719745084945191}
+  - component: {fileID: 483135667179056588}
   m_Layer: 15
   m_Name: EnemyKnight
   m_TagString: Untagged
@@ -39,7 +39,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7662487014537259377}
-  - {fileID: 1921242229399314825}
   - {fileID: 5839588377158889054}
   - {fileID: 462421761013949753}
   - {fileID: 8828391644519384959}
@@ -216,19 +215,7 @@ MonoBehaviour:
   _settings: {fileID: 11400000, guid: 1aa05cf20226fd9458604b10299a7971, type: 2}
   _locks:
   - {fileID: 617222969088435971}
---- !u!114 &3921563154337381813
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2426919192178955622}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c06576f8fe0ebe4f9ac6949b59586f3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemyKnightAttack
-  _hitbox: {fileID: 1946155668536057035}
+  _shieldCollider: {fileID: 0}
 --- !u!114 &5275010070133413985
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -248,6 +235,10 @@ MonoBehaviour:
   _warningColorStart: {r: 1, g: 1, b: 0, a: 0.4}
   _warningColorEnd: {r: 1, g: 0, b: 0, a: 0.9}
   _rayOriginHeight: 0.3
+  _chargeSpeed: 14
+  _chargeDuration: 0.8
+  _chargeDamage: 20
+  _chargeCooldown: 5
   _trailRenderer: {fileID: 0}
 --- !u!114 &4563719745084945191
 MonoBehaviour:
@@ -262,6 +253,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemySealComponent
   _overlayRenderer: {fileID: 7762490750886196820}
+--- !u!114 &483135667179056588
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2426919192178955622}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2faa7f3e5959024c8189a6731b66d08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.ObjectFlipController
+  _flipSourceType: 1
+  _flipTargets:
+  - {fileID: 7662487014537259377}
+  - {fileID: 5839588377158889054}
+  - {fileID: 462421761013949753}
+  - {fileID: 8828391644519384959}
+  _invertList: 01
 --- !u!1 &2501337700725975956
 GameObject:
   m_ObjectHideFlags: 0
@@ -482,84 +492,6 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
---- !u!1 &4798435732291026123
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1921242229399314825}
-  - component: {fileID: 1946155668536057035}
-  m_Layer: 16
-  m_Name: EnemyAttackHitBox
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1921242229399314825
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4798435732291026123}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 8098318713505367686}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!61 &1946155668536057035
-BoxCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4798435732291026123}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 1
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_SpriteTilingProperty:
-    border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0, y: 0}
-    oldSize: {x: 0, y: 0}
-    newSize: {x: 0, y: 0}
-    adaptiveTilingThreshold: 0
-    drawMode: 0
-    adaptiveTiling: 0
-  m_AutoTiling: 0
-  m_Size: {x: 1, y: 0.5}
-  m_EdgeRadius: 0
 --- !u!1 &5434766454637887654
 GameObject:
   m_ObjectHideFlags: 0

@@ -155,7 +155,6 @@ namespace KEY
         /// </summary>
         public void ResetDummy()
         {
-            ResetHp();
             _isLockUnlocked = false;
             _lockComponent?.ResetLock();
 

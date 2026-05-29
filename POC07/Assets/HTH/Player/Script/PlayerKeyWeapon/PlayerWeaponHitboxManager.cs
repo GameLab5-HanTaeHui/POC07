@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// PlayerWeaponHitboxManager.cs  v1.2
+// PlayerWeaponHitboxManager.cs  v1.3
 // 플레이어 무기 히트박스 관리 컴포넌트
 //
 // [v1.2 변경 — Enemy + EnemyLock 레이어 분리 감지]
@@ -27,6 +27,19 @@
 //     두 레이어를 합산해서 OverlapCollider 에 사용.
 //     충돌 후 레이어 비트 연산으로 분기.
 //
+// [v1.3 변경 — EnemyShield 레이어 명시적 무시]
+//   EnemyShield 레이어 필드 추가 (_shieldLayer).
+//   CheckHit() 에서 EnemyShield 레이어 감지 시 즉시 continue.
+//   방패(ShieldCollider)가 플레이어 무기 히트박스 감지 마스크에 포함되더라도
+//   코드 레벨에서 명시적으로 무시.
+//
+//   [방패 차단 동작 원리]
+//     ShieldCollider.isTrigger = OFF → 물리 충돌로 플레이어가 방패를 통과 못 함.
+//     플레이어 히트박스(isTrigger=ON)와 ShieldCollider(isTrigger=OFF)는
+//     OnTriggerEnter 가 발생하지 않음. (둘 다 isTrigger=OFF 여야 물리 충돌)
+//     그러나 Overlap() 은 isTrigger 무관하게 모든 콜라이더를 감지할 수 있음.
+//     → _shieldLayer 를 명시적으로 무시해서 확실하게 차단.
+//
 // [v1.1 변경]
 //   히트박스 좌우 반전 처리 (OnFlipped 구독).
 //
@@ -41,15 +54,16 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 플레이어 무기 히트박스 관리 컴포넌트. (v1.2)
+    /// 플레이어 무기 히트박스 관리 컴포넌트. (v1.3)
     ///
     /// ────────────────────────────────────────────────────
-    /// [감지 흐름 — v1.2]
+    /// [감지 흐름 — v1.3]
     ///   OverlapCollider(_enemyLayer | _lockLayer)
     ///     → 감지된 콜라이더의 Layer 확인
-    ///       EnemyLock 레이어 → LockComponent.TakeDamage()
-    ///       Enemy 레이어     → IDamageable.TakeDamage()
-    ///                           (EnemyKnight 내부에서 Lock 해제 여부 판단)
+    ///       EnemyShield 레이어 → 무시 (방패 차단)
+    ///       EnemyLock 레이어   → LockComponent.TakeDamage()
+    ///       Enemy 레이어       → IDamageable.TakeDamage()
+    ///                             (EnemyKnight 내부에서 Lock 해제 여부 판단)
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class PlayerWeaponHitboxManager : MonoBehaviour
@@ -91,6 +105,20 @@ namespace KEY
         /// </summary>
         [Tooltip("자물쇠 레이어. EnemyLock 레이어 선택.")]
         [SerializeField] private LayerMask _lockLayer;
+
+        /// <summary>
+        /// 방패 레이어마스크. (v1.3 추가)
+        /// EnemyShield 레이어 선택.
+        /// 감지 시 아무것도 하지 않음 — 방패 차단.
+        ///
+        /// [왜 별도 필드인가?]
+        ///   Overlap() 은 useTriggers=true 설정 시 isTrigger=OFF 콜라이더도
+        ///   일부 상황에서 감지할 수 있음. 명시적으로 무시해서 확실하게 차단.
+        ///   _shieldLayer 를 combinedMask 에서 제외하는 방법도 있지만,
+        ///   명시적 continue 분기가 의도를 더 명확하게 표현.
+        /// </summary>
+        [Tooltip("방패 레이어. EnemyShield 레이어 선택. 감지 시 무시.")]
+        [SerializeField] private LayerMask _shieldLayer;
 
         // ──────────────────────────────────────────
         // 히트박스 위치 캐시 (v1.1)
@@ -248,6 +276,15 @@ namespace KEY
                 if (_hitTargets.Contains(col)) continue;
 
                 int colLayer = col.gameObject.layer;
+
+                // ── EnemyShield 레이어 → 방패 차단, 무시 ──────────────
+                if ((_shieldLayer.value & (1 << colLayer)) != 0)
+                {
+                    // 방패 콜라이더 감지 — 아무것도 하지 않음
+                    // ShieldCollider.isTrigger=OFF 의 물리 충돌이 이미 통과를 막고 있음
+                    Debug.Log($"[HitboxManager] 방패 감지 → 무시: {col.name}");
+                    continue;
+                }
 
                 // ── EnemyLock 레이어 → LockComponent 직접 호출 ──────────
                 if ((_lockLayer.value & (1 << colLayer)) != 0)
