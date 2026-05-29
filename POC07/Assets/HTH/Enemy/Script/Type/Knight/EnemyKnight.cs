@@ -49,8 +49,6 @@
 //   namespace : KEY
 // ============================================================
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -119,7 +117,7 @@ namespace KEY
         // 컴포넌트 참조
         // ──────────────────────────────────────────
 
-        private EnemySealComponent _sealComponent;
+        private SealComponent _sealComponent;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -142,7 +140,7 @@ namespace KEY
         {
             base.Awake();
 
-            _sealComponent = GetComponent<EnemySealComponent>();
+            _sealComponent = GetComponent<SealComponent>();
 
             // Inspector 미연결 시 자동 수집
             if (_locks.Count == 0)

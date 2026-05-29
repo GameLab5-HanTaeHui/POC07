@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// EnemyAI.cs  v5.0
+// EnemyAI.cs  v5.1
 // 적 공용 AI — 리모델링 (기사형 차징 전용)
 //
 // [v5.0 리모델링 변경]
@@ -21,6 +21,9 @@
 //       근접 공격 완료 핸들러 불필요.
 //       차징 완료 or 벽 충돌 → EnterGroggy() 만 남음.
 //
+// [v5.1 변경]
+//   SealComponent → SealComponent 로 교체.
+//
 // [v4.4 변경]
 //   FlipAttackHitboxes() 제거 → OnFlipped 이벤트 발행.
 //
@@ -38,7 +41,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 공용 AI 컴포넌트. (v5.0)
+    /// 적 공용 AI 컴포넌트. (v5.1)
     ///
     /// ────────────────────────────────────────────────────
     /// [상태 전환 다이어그램]
@@ -99,7 +102,7 @@ namespace KEY
         private EnemySensor _sensor;
         private Rigidbody2D _rigid2D;
         private SpriteRenderer _spriteRenderer;
-        private EnemySealComponent _sealComponent;
+        private SealComponent _sealComponent;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -143,7 +146,7 @@ namespace KEY
             _sensor = GetComponent<EnemySensor>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
-            _sealComponent = GetComponent<EnemySealComponent>();
+            _sealComponent = GetComponent<SealComponent>();
             _chargeAttack = GetComponent<EnemyKnightChargeAttack>();
 
             // DataSO 는 EnemyBase 에서 취득

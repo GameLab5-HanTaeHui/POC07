@@ -9009,7 +9009,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7662487014537259377, guid: 14f2dc0b51ebfad4c9fbf8cb28b17f60, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8098318713505367686, guid: 14f2dc0b51ebfad4c9fbf8cb28b17f60, type: 3}
       propertyPath: m_LocalPosition.x
@@ -9077,12 +9077,20 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 1000132557976791758, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: _attackBlocked
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1000132557976791758, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: _projectilePrefab
       value: 
       objectReference: {fileID: -1740810683833375392, guid: aa409b05978ae9e4a96c826e412d3da4, type: 3}
     - target: {fileID: 1496568946723596392, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: _shieldLayer.m_Bits
       value: 262144
+      objectReference: {fileID: 0}
+    - target: {fileID: 6183250107901851475, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: _attackBlocked
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7706058441628014487, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: m_Name
@@ -9152,5 +9160,5 @@ SceneRoots:
   - {fileID: 1495413478}
   - {fileID: 8310257814371544144}
   - {fileID: 609719594}
-  - {fileID: 288184098}
   - {fileID: 1820028511}
+  - {fileID: 288184098}

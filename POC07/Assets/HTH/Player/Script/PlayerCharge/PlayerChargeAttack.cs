@@ -321,22 +321,48 @@ namespace KEY
 
         private void Fire(KeyDataSO data, float chargePower)
         {
-            Vector2 direction = GetFireDirection(data);
+            if (data.chargeProjectilePrefab == null) { EndCharge(); return; }
+
             Vector3 firePos = _firePoint != null
                 ? _firePoint.position
                 : transform.position;
 
             var go = Instantiate(data.chargeProjectilePrefab, firePos, Quaternion.identity);
-            var projectile = go.GetComponent<IChargeProjectile>();
 
+            // ── SealProjectile 경로 (봉인 투사체) ──────────────────────
+            var sealProjectile = go.GetComponent<SealProjectile>();
+            if (sealProjectile != null)
+            {
+                // SealKeyWeapon 에서 SealDataSO 취득
+                SealDataSO sealData = null;
+                if (_weaponController?.CurrentWeapon is SealKeyWeapon sealWeapon)
+                    sealData = sealWeapon.SealData;
+
+                if (sealData != null)
+                {
+                    sealProjectile.Launch(sealData, _facingOverride);
+                    Debug.Log($"[PlayerChargeAttack] 봉인 발사 — 각도:{_aimAngle:F1}° 방향:{_facingOverride}");
+                }
+                else
+                {
+                    Debug.LogError("[PlayerChargeAttack] SealData 가 null 입니다.");
+                    Destroy(go);
+                }
+
+                EndCharge();
+                return;
+            }
+
+            // ── IChargeProjectile 경로 (추후 확장용) ───────────────────
+            var projectile = go.GetComponent<IChargeProjectile>();
             if (projectile != null)
             {
-                projectile.Launch(direction, chargePower);
+                projectile.Launch(GetFireDirection(data), chargePower);
                 Debug.Log($"[PlayerChargeAttack] 발사 — 각도:{_aimAngle:F1}° 파워:{chargePower:F2}");
             }
             else
             {
-                Debug.LogError("[PlayerChargeAttack] IChargeProjectile 구현체가 없습니다.");
+                Debug.LogError("[PlayerChargeAttack] SealProjectile / IChargeProjectile 구현체가 없습니다.");
                 Destroy(go);
             }
 

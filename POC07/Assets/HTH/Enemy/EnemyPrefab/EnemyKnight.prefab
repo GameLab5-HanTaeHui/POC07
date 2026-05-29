@@ -153,8 +153,8 @@ GameObject:
   - component: {fileID: 7998307356327303282}
   - component: {fileID: 1363594226704711952}
   - component: {fileID: 8034309942722479110}
+  - component: {fileID: 1403238649912887931}
   - component: {fileID: 5275010070133413985}
-  - component: {fileID: 4563719745084945191}
   - component: {fileID: 483135667179056588}
   m_Layer: 15
   m_Name: EnemyKnight
@@ -354,7 +354,20 @@ MonoBehaviour:
   _settings: {fileID: 11400000, guid: 1aa05cf20226fd9458604b10299a7971, type: 2}
   _locks:
   - {fileID: 617222969088435971}
-  _shieldCollider: {fileID: 0}
+  _shieldCollider: {fileID: 4939132374348422104}
+--- !u!114 &1403238649912887931
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2426919192178955622}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fad3f50bee1fb4b48aa1c42aef4d50ed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.SealComponent
+  _overlayRenderer: {fileID: 7762490750886196820}
 --- !u!114 &5275010070133413985
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -379,19 +392,6 @@ MonoBehaviour:
   _chargeDamage: 20
   _chargeCooldown: 5
   _trailRenderer: {fileID: 0}
---- !u!114 &4563719745084945191
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2426919192178955622}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a46d93a1c0f93aa41afdf1484cceea59, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemySealComponent
-  _overlayRenderer: {fileID: 7762490750886196820}
 --- !u!114 &483135667179056588
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -753,7 +753,7 @@ Transform:
   m_GameObject: {fileID: 6425982617646505072}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1, y: 0.2, z: 0}
+  m_LocalPosition: {x: -1, y: 1, z: 0}
   m_LocalScale: {x: 2, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

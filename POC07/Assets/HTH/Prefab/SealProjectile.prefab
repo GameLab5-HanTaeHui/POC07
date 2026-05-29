@@ -12,10 +12,9 @@ GameObject:
   - component: {fileID: 1568258473479839991}
   - component: {fileID: 8812626366712869892}
   - component: {fileID: 3996272588067423807}
-  - component: {fileID: 4965445583665423809}
   - component: {fileID: -1740810683833375392}
   m_Layer: 12
-  m_Name: ChargeProjectile
+  m_Name: SealProjectile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -158,28 +157,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.15
---- !u!114 &4965445583665423809
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1827982291770101476}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5e691c338a4ba714597739910f5ed854, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KEY.ChargeProjectile
-  _baseSpeed: 10
-  _maxSpeedMultiplier: 2
-  _projectileLifetime: 3
-  _enemyLayer:
-    serializedVersion: 2
-    m_Bits: 262144
-  _terrainLayer:
-    serializedVersion: 2
-    m_Bits: 3178496
-  _launchPunchStrength: 0.5
 --- !u!114 &-1740810683833375392
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -195,3 +172,9 @@ MonoBehaviour:
   _sealLayer:
     serializedVersion: 2
     m_Bits: 262144
+  _shieldLayer:
+    serializedVersion: 2
+    m_Bits: 262144
+  _terrainLayer:
+    serializedVersion: 2
+    m_Bits: 3145728
