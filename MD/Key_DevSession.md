@@ -674,6 +674,100 @@ Player (루트)                       Layer: Player (8)
 | `EnemyKnightChargeAttack.cs` | v2.1 | FlipHitbox 제거 |
 | `LockComponent.cs` | v2.1 | FlipPosition 제거 |
 
+---
+
+### v0.20 — 봉인 시스템 구조 재설계 (SealDataSO 제거 / KeyDataSO 통합)
+
+**배경**
+`SealDataSO` / `SealKeyWeapon` / `ChargeProjectile` 이 별도로 존재하여
+열쇠마다 SO가 따로 필요하고 발사 경로가 분리되는 구조적 문제.
+모든 열쇠는 S키로 봉인 투사체를 발사할 수 있어야 하므로
+봉인 수치를 `KeyDataSO` 하나에 통합하고 구조를 단순화.
+
+**완성 파일**
+
+| 파일 | 버전 | 핵심 변경 |
+|---|---|---|
+| `KeyDataSO.cs` | v1.4 | 봉인 수치 섹션 추가 (sealType ~ sealColor 10개 필드) |
+| `SealProjectile.cs` | v2.0 | SealDataSO → KeyDataSO 참조 / Launch(KeyDataSO, dir, power) |
+| `SealComponent.cs` | v1.1 | ApplySeal(SealDataSO) → ApplySeal(KeyDataSO) |
+| `EnemyAI.cs` | v5.1 | EnemySealComponent → SealComponent 교체 |
+| `EnemyKnight.cs` | v2.1 | EnemySealComponent → SealComponent 교체 |
+| `PlayerChargeAttack.cs` | v1.4 | Fire() → SealProjectile 직접 발사 |
+| `PlayerWeaponController.cs` | v1.5 | SealKeyWeapon/SealDataSO 분기 전체 제거 |
+
+**제거된 파일**
+
+| 파일 | 이유 |
+|---|---|
+| `SealDataSO.cs` | KeyDataSO 에 통합 |
+| `SealKeyWeapon.cs` | 별도 무기 불필요 |
+| `ChargeProjectile.cs` | SealProjectile 로 통합 |
+| `EnemySealComponent.cs` | SealComponent 로 대체 |
+
+**올바른 기믹 흐름 (재정의)**
+
+```
+[S키 — 봉인 부여]
+  PlayerChargeAttack.Fire()
+    → SealProjectile.Launch(KeyDataSO, facingDir, chargePower)
+        → EnemyShield 명중 → HitFeedback.PlayerAttackBlocked() + 소멸
+        → Enemy 명중      → SealComponent.ApplySeal(KeyDataSO) + 소멸
+        → 지형 충돌       → 소멸
+
+[봉인 유지 — 시간 기반 자동 해제]
+  SealComponent.Update()
+    → _activeSeals 잔여시간 감산
+    → 0 이하 → RemoveSeal() → OnSealRemoved
+
+[EnemyAI 봉인 체크]
+  행동 실행 직전 → SealComponent.IsSealedAction(SealType)
+    → true  : 행동 스킵
+    → false : 행동 실행
+
+[Lock 과의 관계 — 완전 독립]
+  Lock  = 적 본체 해금 장치  ← 일반 A키 공격으로 해제
+  Seal  = 적 기능 봉인 장치  ← S키 투사체로 부여, 시간으로 자동 해제
+```
+
+**KeyDataSO v1.4 추가 필드**
+
+| 필드 | 타입 | 기본값 | 용도 |
+|---|---|---|---|
+| `sealType` | SealType | Dash | 봉인 종류 |
+| `sealDuration` | float | 3.0 | 봉인 지속 시간 (초) |
+| `maxSealCount` | int | 2 | 동시 최대 봉인 수 |
+| `sealProjectileSpeed` | float | 12 | 투사체 이동 속도 |
+| `sealProjectileLifetime` | float | 2 | 투사체 생존 시간 |
+| `sealProjectileScale` | float | 1 | 투사체 크기 |
+| `sealFlashInterval` | float | 0.4 | 봉인 중 깜빡임 간격 |
+| `sealOverlaySprite` | Sprite | null | 봉인 오버레이 스프라이트 |
+| `sealColor` | Color | 파란색 | 봉인 색상 |
+
+**파일 버전 스냅샷 (v0.20 기준)**
+
+| 파일 | 버전 |
+|---|---|
+| `InputManager.cs` | v2.4 |
+| `PlayerMover.cs` | v1.6 |
+| `PlayerChargeAttack.cs` | v1.4 |
+| `PlayerHealth.cs` | v1.0 |
+| `ObjectFlipController.cs` | v1.2 |
+| `PlayerWeaponMover.cs` | v1.2 |
+| `PlayerWeaponController.cs` | v1.5 |
+| `PlayerWeaponHitboxManager.cs` | v1.3 |
+| `KeyDataSO.cs` | v1.4 |
+| `SealProjectile.cs` | v2.0 |
+| `SealComponent.cs` | v1.1 |
+| `EnemyBase.cs` | v2.0 |
+| `EnemyAI.cs` | v5.1 |
+| `EnemyDataSO.cs` | v4.0 |
+| `EnemySensor.cs` | v2.0 |
+| `EnemyKnight.cs` | v2.1 |
+| `EnemyKnightChargeAttack.cs` | v2.1 |
+| `LockComponent.cs` | v2.1 |
+| `HitFeedback.cs` | v1.0 |
+
 ## 미결 항목
 
 | 항목 | 상태 | 메모 |
@@ -681,20 +775,21 @@ Player (루트)                       Layer: Player (8)
 | Player.controller 에디터 수정 | ✅ 완료 | v0.7 가이드 |
 | Attack 클립 Loop Time OFF | ✅ 완료 | v0.8 |
 | SealProjectile Prefab 생성 | ✅ 완료 | Assets/KEY/Prefabs/ |
-| EnemySealComponent 적 부착 | ✅ 완료 | Enemy_Knight 우선 |
-| SealData 에셋 생성 | ✅ 완료 | Assets/KEY/DataSO/Seals/ |
 | LockComponent 단일 → List 변환 | ✅ 완료 | v0.17 EnemyKnight v1.4 |
 | Enemy 콜라이더 레이어 기반 방어 리모델링 | ✅ 완료 | v0.18 |
 | ObjectFlipController 도입 | ✅ 완료 | v0.19 |
 | EnemyDataSO 차징 수치 분리 | ✅ 완료 | v0.19 |
-| ChargeProjectile Prefab 생성 | 🔲 미착수 | RustyKeyData.chargeProjectilePrefab 연결 필요 |
+| SealDataSO / SealKeyWeapon / ChargeProjectile 제거 | ✅ 완료 | v0.20 |
+| EnemySealComponent → SealComponent 대체 | ✅ 완료 | v0.20 |
+| KeyDataSO 봉인 수치 통합 | ✅ 완료 | v0.20 KeyDataSO v1.4 |
+| SealProjectile KeyDataSO 참조 통합 | ✅ 완료 | v0.20 SealProjectile v2.0 |
+| PlayerWeaponController Seal 분기 제거 | ✅ 완료 | v0.20 v1.5 |
 | using Unity.VisualScripting 제거 | 🔲 미착수 | PlayerWeaponHitboxManager |
 | 스프라이트 / 애니메이션 클립 | 🔲 미착수 | 완성 후 클립 연결 |
 | AnimatorOverrideController | 🔲 보류 | 스프라이트 완성 후 |
 | LockComponent 해제 조건 다양화 | 🔲 미착수 | 방향/위상/시간 조건 확장 |
-| SealProjectile ↔ Enemy 레이어 확인 | 🔲 미착수 | Physics 2D Matrix 설정 검증 필요 |
-| KeyType enum 4종 추가 | 🔲 미착수 | 봉인/반전/연쇄/귀환 열쇠 |
-| 테스트 씬 구성 | 🔲 미착수 | 차징 공격 + 기사 돌진 전투 테스트 |
+| KeyType enum 추가 | 🔲 미착수 | 봉인/반전/연쇄/귀환 열쇠 |
+| 테스트 씬 구성 | 🔲 미착수 | SealProjectile 봉인 + Lock 해제 전투 테스트 |
 | GameManager | 🔲 미착수 | 씬 전역 관리 |
 | CinemachineCamera | 🔲 미착수 | 플레이어 추적 카메라 |
 

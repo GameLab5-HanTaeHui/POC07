@@ -1,31 +1,20 @@
 ﻿// ============================================================
-// PlayerWeaponController.cs  v1.4
+// PlayerWeaponController.cs  v1.5
 // 열쇠 교체 핵심 컨트롤러
 //
-// [v1.4 변경]
-//   SealKeyWeapon 연동 추가.
-//   ActivateWeapon() 내부에서 SealKeyWeapon 캐스팅 후
-//   SetSealData() 호출 분기 추가.
+// [v1.5 변경]
+//   SealKeyWeapon / SealDataSO 분기 제거.
+//   모든 열쇠는 KeyDataSO 하나로 관리.
+//   봉인 수치(sealType, sealDuration 등)는 KeyDataSO 에 통합.
+//   WeaponEntry.sealData 슬롯 제거.
+//   ActivateSealWeapon() 제거.
+//   HandleKeyEquipped() Seal 분기 제거 → 모든 열쇠 ActivateWeapon() 통일.
 //
-//   [SealKeyWeapon 이 KeyDataSO 를 사용하지 않는 이유]
-//     봉인 열쇠는 콤보 타이밍, 스윙 거리, 히트박스 비율 등
-//     KeyDataSO 필드를 전혀 사용하지 않음.
-//     독립 SO(SealDataSO) 구조로 역할을 명확히 분리.
-//     → weapon.SetKeyData(keyData) 대신
-//       (weapon as SealKeyWeapon).SetSealData(sealData) 호출.
-//
-//   [SealDataSO 취득 방법]
-//     WeaponEntry 에 SealDataSO 슬롯 추가.
-//     keyType = Seal 인 엔트리는 sealData 필드에서 데이터 취득.
-//     기존 keyType (Rusty 등) 은 keyData 필드에서 취득 (기존 동작 유지).
-//
-// [교체 흐름 — v1.4]
+// [교체 흐름 — v1.5]
 //   KeyInventoryDataSO.EquipKey()
 //     → OnKeyEquipped(KeyDataSO) 이벤트
 //       → HandleKeyEquipped(keyData)
-//           → keyData.keyType == Seal 인가?
-//               Yes → ActivateSealWeapon(sealWeapon, entry.sealData)
-//               No  → ActivateWeapon(weapon, keyData)  ← 기존
+//           → ActivateWeapon(weapon, keyData)  ← 모든 타입 동일
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -64,19 +53,11 @@ namespace KEY
 
             /// <summary>
             /// 대응하는 무기 컴포넌트 (MonoBehaviour 타입).
-            /// Inspector 에서 RustyKeyWeapon, SealKeyWeapon 등을 드래그 연결.
+            /// Inspector 에서 RustyKeyWeapon 등을 드래그 연결.
             /// PlayerWeaponBase 미상속 시 Awake 에서 LogError 출력.
             /// </summary>
             [Tooltip("무기 컴포넌트. 비활성 상태로 미리 부착.")]
             public MonoBehaviour weapon;
-
-            /// <summary>
-            /// 봉인 열쇠 전용 데이터 SO.
-            /// keyType = KeyType.Seal 일 때만 사용.
-            /// 다른 keyType 이면 이 필드는 무시됨.
-            /// </summary>
-            [Tooltip("봉인 열쇠 전용 SealDataSO. keyType = Seal 일 때만 연결.")]
-            public SealDataSO sealData;
         }
 
         // ──────────────────────────────────────────
@@ -141,13 +122,6 @@ namespace KEY
         private readonly Dictionary<KeyType, PlayerWeaponBase> _weaponMap
             = new Dictionary<KeyType, PlayerWeaponBase>();
 
-        /// <summary>
-        /// KeyType → WeaponEntry 런타임 딕셔너리.
-        /// SealData 취득에 사용.
-        /// </summary>
-        private readonly Dictionary<KeyType, WeaponEntry> _entryMap
-            = new Dictionary<KeyType, WeaponEntry>();
-
         /// <summary> 현재 활성화된 무기 컴포넌트. </summary>
         private PlayerWeaponBase _currentWeapon;
 
@@ -198,35 +172,7 @@ namespace KEY
                 return;
             }
 
-            // ── SealKeyWeapon 전용 분기 ──────────────────────
-            if (keyData.keyType == KeyType.Seal)
-            {
-                // SealKeyWeapon 캐스팅
-                if (nextWeapon is SealKeyWeapon sealWeapon)
-                {
-                    // SealDataSO 취득 — WeaponEntry 에서 읽음
-                    if (_entryMap.TryGetValue(keyData.keyType, out var entry)
-                        && entry.sealData != null)
-                    {
-                        ActivateSealWeapon(sealWeapon, entry.sealData);
-                        Debug.Log($"[PlayerWeaponController] 봉인 무기 교체: {entry.sealData.sealKeyName}");
-                    }
-                    else
-                    {
-                        Debug.LogError("[PlayerWeaponController] SealKeyWeapon 에 SealDataSO 가 " +
-                                       "연결되지 않았습니다. WeaponEntry.sealData 를 확인하세요.");
-                    }
-                }
-                else
-                {
-                    Debug.LogError($"[PlayerWeaponController] KeyType.Seal 에 매핑된 컴포넌트가 " +
-                                   $"SealKeyWeapon 이 아닙니다: {nextWeapon.GetType().Name}");
-                }
-
-                return;
-            }
-
-            // ── 일반 무기 활성화 ──────────────────────
+            // ── 무기 활성화 ──────────────────────
             ActivateWeapon(nextWeapon, keyData);
             TrySwapAnimatorOverride(keyData);
 
@@ -269,25 +215,6 @@ namespace KEY
         }
 
         /// <summary>
-        /// 봉인 열쇠 무기 활성화.
-        /// SealDataSO 를 주입하고 컴포넌트를 활성화.
-        ///
-        /// [일반 무기와의 차이]
-        ///   SetKeyData() 대신 SetSealData() 호출.
-        ///   봉인 열쇠는 콤보/스윙 이동이 없으므로
-        ///   MovementAnimator / WeaponAnimator / WeaponMover 재구독 생략.
-        /// </summary>
-        private void ActivateSealWeapon(SealKeyWeapon weapon, SealDataSO sealData)
-        {
-            weapon.SetSealData(sealData);
-            weapon.enabled = true;
-            _currentWeapon = weapon;
-
-            // 봉인 열쇠는 콤보 Trigger 없음 → MovementAnimator 재구독 불필요
-            // 봉인 열쇠는 스윙 이동 없음 → WeaponAnimator / WeaponMover 재구독 불필요
-        }
-
-        /// <summary>
         /// AnimatorOverrideController 스왑.
         /// </summary>
         private void TrySwapAnimatorOverride(KeyDataSO keyData)
@@ -303,7 +230,6 @@ namespace KEY
         private void BuildWeaponMap()
         {
             _weaponMap.Clear();
-            _entryMap.Clear();
 
             foreach (var entry in _weaponEntries)
             {
@@ -329,7 +255,6 @@ namespace KEY
 
                 weaponBase.enabled = false;
                 _weaponMap[entry.keyType] = weaponBase;
-                _entryMap[entry.keyType] = entry;
             }
         }
 

@@ -1,6 +1,15 @@
 ﻿// ============================================================
-// SealComponent.cs  v1.0
+// SealComponent.cs  v1.2
 // 적 봉인 상태 관리 컴포넌트 — EnemySealComponent 대체
+//
+// [v1.2 변경]
+//   Update() Dictionary 순회 중 직접 수정 버그 수정.
+//   _updateBuffer 추가 — 값 갱신을 순회 종료 후 일괄 처리.
+//   InvalidOperationException 해결.
+//
+// [v1.1 변경]
+//   ApplySeal(SealDataSO data) → ApplySeal(KeyDataSO data) 로 변경.
+//   모든 봉인 수치를 KeyDataSO 의 seal* 필드에서 읽음.
 //
 // [EnemySealComponent 와의 차이]
 //   클래스명 변경: EnemySealComponent → SealComponent
@@ -14,7 +23,7 @@
 //
 // [봉인 적용 흐름]
 //   SealProjectile.OnTriggerEnter2D()
-//     → SealComponent.ApplySeal(SealDataSO)
+//     → SealComponent.ApplySeal(KeyDataSO)
 //         → _activeSeals 딕셔너리에 (SealType, 잔여시간) 등록
 //         → maxSealCount 초과 시 가장 오래된 봉인 제거
 //         → OnSealApplied 이벤트 발행
@@ -43,7 +52,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 봉인 상태 관리 컴포넌트. (v1.0)
+    /// 적 봉인 상태 관리 컴포넌트. (v1.2)
     ///
     /// ────────────────────────────────────────────────────
     /// [부착 위치]
@@ -116,6 +125,14 @@ namespace KEY
 
         private readonly List<SealType> _expiredBuffer = new List<SealType>();
 
+        /// <summary>
+        /// Update() 에서 잔여시간 갱신용 임시 버퍼.
+        /// Dictionary 순회 중 직접 수정 시 발생하는
+        /// InvalidOperationException 방지를 위해 분리.
+        /// </summary>
+        private readonly Dictionary<SealType, float> _updateBuffer
+            = new Dictionary<SealType, float>();
+
         // ──────────────────────────────────────────
         // 이벤트
         // ──────────────────────────────────────────
@@ -157,15 +174,25 @@ namespace KEY
 
             _expiredBuffer.Clear();
 
+            // ★ _activeSeals 순회 중 딕셔너리 직접 수정 금지
+            //   → 키 목록을 먼저 별도 컬렉션으로 복사 후 순회
+            //   → 값 갱신은 순회 종료 후 _updateBuffer 로 일괄 처리
+            _updateBuffer.Clear();
+
             foreach (var pair in _activeSeals)
             {
                 float remaining = pair.Value - Time.deltaTime;
                 if (remaining <= 0f)
                     _expiredBuffer.Add(pair.Key);
                 else
-                    _activeSeals[pair.Key] = remaining;
+                    _updateBuffer.Add(pair.Key, remaining);
             }
 
+            // 갱신 — 순회 종료 후 안전하게 적용
+            foreach (var pair in _updateBuffer)
+                _activeSeals[pair.Key] = pair.Value;
+
+            // 만료 봉인 제거
             foreach (SealType expired in _expiredBuffer)
                 RemoveSeal(expired);
         }
@@ -186,7 +213,7 @@ namespace KEY
         /// [같은 타입 재적용] 타이머 리셋 (스택 없음)
         /// [maxSealCount 초과] 가장 오래된 봉인 제거 후 추가
         /// </summary>
-        public void ApplySeal(SealDataSO data)
+        public void ApplySeal(KeyDataSO data)
         {
             if (data == null) return;
 
@@ -295,7 +322,7 @@ namespace KEY
         // 내부 — 비주얼 피드백
         // ══════════════════════════════════════════════════════
 
-        private void StartSealVisual(SealDataSO data)
+        private void StartSealVisual(KeyDataSO data)
         {
             if (_overlayRenderer != null)
             {
@@ -325,7 +352,7 @@ namespace KEY
                 _spriteRenderer.color = _originalColor;
         }
 
-        private IEnumerator SealFlashRoutine(SealDataSO data)
+        private IEnumerator SealFlashRoutine(KeyDataSO data)
         {
             float interval = data.sealFlashInterval;
 

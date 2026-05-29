@@ -1,21 +1,17 @@
 ﻿// ============================================================
-// SealProjectile.cs  v1.1
+// SealProjectile.cs  v2.0
 // 봉인 열쇠 투사체 컴포넌트
 //
-// [v1.1 변경]
-//   ① EnemySealComponent → SealComponent 로 교체
-//   ② EnemyShield 레이어 감지 시 방패 막힘 처리 추가
-//       _shieldLayer 필드 추가.
-//       OnTriggerEnter2D 에서 EnemyShield 감지 시
-//       HitFeedback.PlayerAttackBlocked() + Expire().
-//   ③ 지형(Ground/Wall) 충돌 시 소멸 추가
-//       _terrainLayer 필드 추가.
+// [v2.0 변경]
+//   SealDataSO 참조 완전 제거 → KeyDataSO 참조로 통합.
+//   Launch(SealDataSO, float) → Launch(KeyDataSO, float, float) 로 변경.
+//   chargePower 파라미터 추가 — 투사체 속도/크기 비율에 사용.
+//   봉인 수치는 KeyDataSO 의 seal* 필드에서 읽음.
 //
-// [충돌 분기 — v1.1]
+// [충돌 분기]
 //   EnemyShield 레이어 → 방패 막힘 피드백 + Expire()
-//   Enemy 레이어       → SealComponent.ApplySeal() + Expire()
+//   Enemy 레이어       → SealComponent.ApplySeal(KeyDataSO) + Expire()
 //   지형 레이어        → Expire()
-//   기타               → 무시 (관통)
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -28,20 +24,25 @@ using DG.Tweening;
 namespace KEY
 {
     /// <summary>
-    /// 봉인 열쇠 투사체. (v1.1)
+    /// 봉인 투사체. (v2.0)
     ///
     /// ────────────────────────────────────────────────────
     /// [Prefab 구조]
-    ///   SealProjectile (Prefab 루트)   Layer: PlayerHitbox
+    ///   SealProjectile               Layer: PlayerHitbox
     ///   ├── [SealProjectile]
     ///   ├── [Rigidbody2D]    GravityScale=0
-    ///   ├── [CircleCollider2D] isTrigger=ON / radius=0.15
+    ///   ├── [CircleCollider2D] isTrigger=ON
     ///   └── [SpriteRenderer]
     ///
     /// [Inspector 연결]
     ///   _sealLayer   = Enemy 레이어
     ///   _shieldLayer = EnemyShield 레이어
     ///   _terrainLayer = Ground + Wall 레이어
+    ///
+    /// [호출 흐름]
+    ///   PlayerChargeAttack.Fire()
+    ///     → Instantiate(chargeProjectilePrefab)
+    ///     → SealProjectile.Launch(keyData, facingDir, chargePower)
     /// ────────────────────────────────────────────────────
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
@@ -72,7 +73,7 @@ namespace KEY
         /// 지형 레이어. Ground + Wall 레이어 선택.
         /// 충돌 시 즉시 소멸.
         /// </summary>
-        [Tooltip("지형 레이어. Ground + Wall 레이어 선택. 충돌 시 즉시 소멸.")]
+        [Tooltip("지형 레이어. Ground + Wall 레이어 선택.")]
         [SerializeField] private LayerMask _terrainLayer;
 
         // ──────────────────────────────────────────
@@ -86,7 +87,7 @@ namespace KEY
         // 런타임 상태
         // ──────────────────────────────────────────
 
-        private SealDataSO _sealData;
+        private KeyDataSO _keyData;
         private bool _isActive;
         private Coroutine _lifetimeCoroutine;
 
@@ -107,36 +108,52 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // 외부 API — SealKeyWeapon 에서 호출
+        // 외부 API — PlayerChargeAttack 에서 호출
         // ══════════════════════════════════════════════════════
 
         /// <summary>
         /// 투사체 발사.
-        /// SealKeyWeapon.FireProjectile() 에서 Instantiate 직후 호출.
+        /// PlayerChargeAttack.Fire() 에서 Instantiate 직후 호출.
+        ///
+        /// [파라미터]
+        ///   keyData    : 현재 장착된 열쇠 데이터 (봉인 수치 포함)
+        ///   direction  : 발사 방향 (+1 = 오른쪽, -1 = 왼쪽)
+        ///   chargePower: 차징 비율 0~1 (속도/크기 비율)
         /// </summary>
-        public void Launch(SealDataSO data, float direction)
+        public void Launch(KeyDataSO keyData, float direction, float chargePower)
         {
-            if (data == null)
+            if (keyData == null)
             {
-                Debug.LogError("[SealProjectile] SealDataSO 가 null 입니다.");
+                Debug.LogError("[SealProjectile] KeyDataSO 가 null 입니다.");
                 Destroy(gameObject);
                 return;
             }
 
-            _sealData = data;
+            _keyData = keyData;
             _isActive = true;
 
-            if (_spriteRenderer != null && data.projectileSprite != null)
-                _spriteRenderer.sprite = data.projectileSprite;
+            // 크기 — chargePower 에 비례해서 커짐
+            float scale = keyData.sealProjectileScale * Mathf.Lerp(0.7f, 1.3f, chargePower);
+            transform.localScale = Vector3.one * scale;
 
-            transform.localScale = Vector3.one * data.projectileScale;
-
+            // 스프라이트 방향 반전
             if (_spriteRenderer != null)
                 _spriteRenderer.flipX = direction < 0f;
 
-            _rigid2D.linearVelocity = new Vector2(direction * data.projectileSpeed, 0f);
+            // 속도 — chargePower 에 비례
+            float speed = keyData.sealProjectileSpeed * Mathf.Lerp(0.6f, 1.4f, chargePower);
+            _rigid2D.linearVelocity = new Vector2(direction * speed, 0f);
 
-            _lifetimeCoroutine = StartCoroutine(LifetimeRoutine(data.projectileLifetime));
+            // DOTween 발사 임팩트
+            transform.DOPunchScale(
+                    Vector3.one * 0.25f * chargePower,
+                    duration: 0.15f,
+                    vibrato: 3,
+                    elasticity: 0.5f)
+                .SetEase(Ease.OutQuart);
+
+            _lifetimeCoroutine =
+                StartCoroutine(LifetimeRoutine(keyData.sealProjectileLifetime));
         }
 
         // ══════════════════════════════════════════════════════
@@ -176,15 +193,10 @@ namespace KEY
         // 방패 막힘 처리
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 방패에 막혔을 때 처리.
-        /// HitFeedback.PlayerAttackBlocked() 호출.
-        /// </summary>
         private void HandleShieldBlocked(Collider2D shieldCol)
         {
             var shieldSr = shieldCol.GetComponent<SpriteRenderer>();
 
-            // 투사체 막힘 임팩트
             transform.DOPunchScale(
                     Vector3.one * 0.3f,
                     duration: 0.1f,
@@ -206,18 +218,17 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// Enemy 레이어 명중 시 SealComponent.ApplySeal() 호출.
-        /// SealComponent 없는 적(더미 등)은 봉인 미적용.
+        /// Enemy 레이어 명중 시 SealComponent.ApplySeal(KeyDataSO) 호출.
+        /// SealComponent 없는 적은 봉인 미적용.
         /// </summary>
         private void HandleEnemyHit(Collider2D other)
         {
-            SealComponent sealComponent =
-                other.GetComponentInParent<SealComponent>();
+            var sealComp = other.GetComponentInParent<SealComponent>();
 
-            if (sealComponent != null)
+            if (sealComp != null)
             {
-                sealComponent.ApplySeal(_sealData);
-                Debug.Log($"[SealProjectile] 봉인 적용 → {other.name} / {_sealData.sealType}");
+                sealComp.ApplySeal(_keyData);
+                Debug.Log($"[SealProjectile] 봉인 적용 → {other.name} / {_keyData.sealType}");
             }
             else
             {
@@ -226,17 +237,13 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // 소멸 처리
+        // 소멸
         // ══════════════════════════════════════════════════════
 
         private IEnumerator LifetimeRoutine(float lifetime)
         {
             yield return new WaitForSeconds(lifetime);
-            if (_isActive)
-            {
-                Debug.Log("[SealProjectile] 수명 만료 → 소멸");
-                Expire();
-            }
+            if (_isActive) Expire();
         }
 
         private void Expire()
@@ -263,13 +270,13 @@ namespace KEY
 #if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-            if (_sealData == null) return;
+            if (_keyData == null) return;
             Gizmos.color = new Color(
-                _sealData.sealColor.r,
-                _sealData.sealColor.g,
-                _sealData.sealColor.b,
+                _keyData.sealColor.r,
+                _keyData.sealColor.g,
+                _keyData.sealColor.b,
                 0.4f);
-            Gizmos.DrawSphere(transform.position, 0.15f * _sealData.projectileScale);
+            Gizmos.DrawSphere(transform.position, 0.15f * _keyData.sealProjectileScale);
         }
 #endif
     }

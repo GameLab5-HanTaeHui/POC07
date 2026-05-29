@@ -199,7 +199,6 @@ GameObject:
   - component: {fileID: 1906122826467203638}
   - component: {fileID: 1877226624714106045}
   - component: {fileID: 6183250107901851475}
-  - component: {fileID: 1000132557976791758}
   - component: {fileID: 1867810536550875016}
   - component: {fileID: 8558842223481245099}
   - component: {fileID: 1496568946723596392}
@@ -304,10 +303,6 @@ MonoBehaviour:
   _weaponEntries:
   - keyType: 0
     weapon: {fileID: 6183250107901851475}
-    sealData: {fileID: 0}
-  - keyType: 6
-    weapon: {fileID: 1000132557976791758}
-    sealData: {fileID: 11400000, guid: 1cf803e524f4b894c893b73006ef8a1a, type: 2}
   _animator: {fileID: 2883596316582127693}
   _movementAnimator: {fileID: 3490972193318326748}
   _weaponAnimator: {fileID: 1867810536550875016}
@@ -326,21 +321,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KEY.RustyKeyWeapon
   _attackBlocked: 0
   _hitboxManager: {fileID: 1496568946723596392}
---- !u!114 &1000132557976791758
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4505432061365477098}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dfe5336f2cbd5b14291b1a723874f018, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KEY.SealKeyWeapon
-  _attackBlocked: 1
-  _projectilePrefab: {fileID: 8815555726902294304, guid: 3eed265541d2f5b4e88fb1e1f04ad189, type: 3}
-  _firePoint: {fileID: 477854357227526693}
 --- !u!114 &1867810536550875016
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -391,7 +371,7 @@ MonoBehaviour:
     m_Bits: 131072
   _shieldLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 262144
 --- !u!1 &4517407843543251923
 GameObject:
   m_ObjectHideFlags: 0

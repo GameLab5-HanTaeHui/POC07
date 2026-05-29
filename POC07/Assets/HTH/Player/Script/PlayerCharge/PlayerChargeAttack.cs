@@ -321,7 +321,12 @@ namespace KEY
 
         private void Fire(KeyDataSO data, float chargePower)
         {
-            if (data.chargeProjectilePrefab == null) { EndCharge(); return; }
+            if (data.chargeProjectilePrefab == null)
+            {
+                Debug.LogWarning($"[PlayerChargeAttack] '{data.keyName}' 의 chargeProjectilePrefab 이 없습니다.");
+                EndCharge();
+                return;
+            }
 
             Vector3 firePos = _firePoint != null
                 ? _firePoint.position
@@ -329,31 +334,17 @@ namespace KEY
 
             var go = Instantiate(data.chargeProjectilePrefab, firePos, Quaternion.identity);
 
-            // ── SealProjectile 경로 (봉인 투사체) ──────────────────────
+            // SealProjectile — 봉인 투사체 (모든 열쇠 공통)
             var sealProjectile = go.GetComponent<SealProjectile>();
             if (sealProjectile != null)
             {
-                // SealKeyWeapon 에서 SealDataSO 취득
-                SealDataSO sealData = null;
-                if (_weaponController?.CurrentWeapon is SealKeyWeapon sealWeapon)
-                    sealData = sealWeapon.SealData;
-
-                if (sealData != null)
-                {
-                    sealProjectile.Launch(sealData, _facingOverride);
-                    Debug.Log($"[PlayerChargeAttack] 봉인 발사 — 각도:{_aimAngle:F1}° 방향:{_facingOverride}");
-                }
-                else
-                {
-                    Debug.LogError("[PlayerChargeAttack] SealData 가 null 입니다.");
-                    Destroy(go);
-                }
-
+                sealProjectile.Launch(data, _facingOverride, chargePower);
+                Debug.Log($"[PlayerChargeAttack] 봉인 발사 — 방향:{_facingOverride} 파워:{chargePower:F2}");
                 EndCharge();
                 return;
             }
 
-            // ── IChargeProjectile 경로 (추후 확장용) ───────────────────
+            // IChargeProjectile — 추후 다른 투사체 확장용
             var projectile = go.GetComponent<IChargeProjectile>();
             if (projectile != null)
             {
