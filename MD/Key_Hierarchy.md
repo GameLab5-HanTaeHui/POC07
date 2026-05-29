@@ -355,32 +355,63 @@ Enemy_DummyLocked
 
 ---
 
-## Enemy_Knight                            Layer: Enemy
-
+## Enemy_Knight                        Layer: Enemy
 ```
-Enemy_Knight
-├── [EnemyKnight]          EnemyBase 상속 — 정면 방패 / 등 뒤 자물쇠 피격 판단 (v1.2)
-│     └── (SO) EnemyDataSO  * KnightData.asset
-├── [EnemyAI]              공용 AI 상태머신 — enemyType=Knight (v3.0)
-│     └── (SO) EnemyDataSO  * KnightData.asset
-├── [EnemyKnightAttack]    EnemyAttackBase 상속 — 근접 내려치기 단타
-├── [EnemySensor]          공용 감지 컴포넌트 (EnemyAI 가 데이터 주입)
-├── [EnemySealComponent]   봉인 상태 관리 (v1.0)
-│     └── _overlayRenderer = SealOverlay/SpriteRenderer
-├── [Rigidbody2D]          gravityScale=1 / FreezeRotation Z
-├── [CapsuleCollider2D]    물리 충돌
+│
+├── [EnemyKnight]                   v2.0
+│     _settings    = KnightData.asset
+│     _locks       = [Lock의 LockComponent]  ← 리스트
+│     _shieldCollider = ShieldCollider의 Collider2D
+│
+├── [EnemyAI]                       v5.0
+│     (DataSO Inspector 연결 없음 — EnemyBase에서 자동 취득)
+│
+├── [EnemyKnightChargeAttack]       v2.0
+│     _chargeHitbox   = ChargeHitbox의 Collider2D (선택)
+│     _lineRenderer   = ChargeWarningLine의 LineRenderer
+│     _countdownText  = (선택) TMP
+│
+├── [EnemySensor]                   v2.0
+│     (DataSO Inspector 연결 없음 — EnemyAI.Start()에서 SetData 주입)
+│
+├── [EnemySealComponent]            v1.0
+│     _overlayRenderer = SealOverlay/SpriteRenderer
+│
+├── [Rigidbody2D]
+│     Gravity Scale = 1
+│     Freeze Rotation Z = ON
+│     Collision Detection = Continuous
+│
+├── [CapsuleCollider2D]             물리 충돌 본체
+│
 ├── [SpriteRenderer]
 │
-├── Lock_Back                              Layer: Lock
-│     ├── [LockComponent]  피격 횟수 누적 / 해제 이벤트
-│     ├── [SpriteRenderer]
-│     └── [BoxCollider2D]  isTrigger=ON
 │
-├── AttackHitbox                           Layer: EnemyHitbox
-│     └── [BoxCollider2D]  isTrigger=ON
+├── ShieldCollider                  Layer: EnemyShield  ← 신규 생성
+│     localPosition = (+0.5, 0, 0)  기사 정면(오른쪽) 기준
+│     [BoxCollider2D]
+│           isTrigger = OFF         ← 물리 충돌로 플레이어 통과 차단
+│           size = (0.3, 1.2)
+│
+├── Lock                            Layer: EnemyLock
+│     localPosition = (-1.7, 0, 0)  기사 후방(왼쪽) ← +1.7 → -1.7 수정
+│     [LockComponent]               v2.0
+│     [SpriteRenderer]
+│     [BoxCollider2D]
+│           isTrigger = ON
+│           size = (0.5, 0.5)
+│
+├── EnemyChargeAttackHitBox         Layer: EnemyAttackHit  (선택)
+│     [BoxCollider2D]
+│           isTrigger = ON
+│
+├── ChargeWarningLine
+│     [LineRenderer]
+│           positionCount = 2
+│           Width = 0.05
 │
 └── SealOverlay
-      └── [SpriteRenderer]  봉인 시 오버레이 표시
+      [SpriteRenderer]              EnemySealComponent._overlayRenderer 연결
 ```
 
 | 컴포넌트 | 필드 | 값 |

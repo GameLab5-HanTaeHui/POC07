@@ -32,6 +32,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using DG.Tweening;
 
 namespace KEY
 {
@@ -190,7 +191,7 @@ namespace KEY
 
             // ④ 피격 플래시
             if (_hitFlashCoroutine != null) StopCoroutine(_hitFlashCoroutine);
-            _hitFlashCoroutine = StartCoroutine(HitFlashRoutine());
+            HitFeedback.PlayerHitEnemy(_spriteRenderer, transform, info.Direction);
 
             // ⑤ 하위 클래스 확장점
             OnDamaged(info);
@@ -263,26 +264,6 @@ namespace KEY
             _isInvincible = true;
             yield return new WaitForSeconds(_settings.iFrameDuration);
             _isInvincible = false;
-        }
-
-        private IEnumerator HitFlashRoutine()
-        {
-            if (_spriteRenderer == null) yield break;
-
-            float elapsed = 0f;
-            float duration = _settings.iFrameDuration;
-            float interval = _settings.hitFlashInterval;
-
-            while (elapsed < duration)
-            {
-                _spriteRenderer.color = Color.red;
-                yield return new WaitForSeconds(interval);
-                _spriteRenderer.color = Color.white;
-                yield return new WaitForSeconds(interval);
-                elapsed += interval * 2f;
-            }
-
-            _spriteRenderer.color = Color.white;
         }
 
         // ══════════════════════════════════════════════════════

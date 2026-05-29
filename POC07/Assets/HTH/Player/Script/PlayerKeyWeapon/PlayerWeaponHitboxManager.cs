@@ -221,9 +221,18 @@ namespace KEY
                 // ── EnemyShield 레이어 → 방패 차단, 무시 ──────────────
                 if ((_shieldLayer.value & (1 << colLayer)) != 0)
                 {
-                    // 방패 콜라이더 감지 — 아무것도 하지 않음
-                    // ShieldCollider.isTrigger=OFF 의 물리 충돌이 이미 통과를 막고 있음
-                    Debug.Log($"[HitboxManager] 방패 감지 → 무시: {col.name}");
+                    Debug.Log($"[HitboxManager] 방패 감지 → 막힘 피드백");
+                    // 방패 SpriteRenderer (없으면 null 전달)
+                    var shieldSr = col.GetComponent<SpriteRenderer>();
+                    // 공격 방향 — 현재 히트박스가 있는 방향 (Weapon localPosition.x 부호)
+                    Vector2 attackDir = new Vector2(
+                        hitbox.transform.position.x - col.transform.position.x, 0f).normalized;
+                    HitFeedback.PlayerAttackBlocked(
+                        shieldSr,
+                        col.transform,           // 방패 Transform
+                        hitbox.transform,        // 무기 히트박스 Transform
+                        attackDir);
+                    _hitTargets.Add(col);  // 이 프레임 중복 호출 방지
                     continue;
                 }
 

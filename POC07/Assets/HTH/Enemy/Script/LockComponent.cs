@@ -38,6 +38,7 @@
 
 using System;
 using UnityEngine;
+using DG.Tweening;
 
 namespace KEY
 {
@@ -187,8 +188,12 @@ namespace KEY
             if (_isUnlocked) return;
 
             _currentHitCount++;
-            RefreshVisual();
             OnLockHit?.Invoke(_currentHitCount, _requiredHitCount);
+            // DOTween 피격 피드백 (RefreshVisual 색상은 OnComplete 에서 처리)
+            HitFeedback.PlayerHitLock(_spriteRenderer, transform,
+                UnlockProgress, Color.Lerp(_lockedColor, _unlockedColor, UnlockProgress));
+            // 색상 Lerp 갱신은 HitFeedback OnComplete 후 RefreshVisual 로 처리
+            DOVirtual.DelayedCall(0.18f, RefreshVisual);
 
             Debug.Log($"[LockComponent] 피격 {_currentHitCount}/{_requiredHitCount} ({gameObject.name})");
 
@@ -207,12 +212,12 @@ namespace KEY
         private void Unlock()
         {
             _isUnlocked = true;
-
-            // 콜라이더 비활성 — 해제 후 추가 피격 없음
-            if (_collider != null)
-                _collider.enabled = false;
-
-            RefreshVisual();
+            if (_collider != null) _collider.enabled = false;
+            // 해제 이펙트 — 노란색 확대 후 원복
+            DOTween.Kill(transform);
+            DOTween.Kill(_spriteRenderer);
+            _spriteRenderer.color = _unlockedColor;
+            transform.DOPunchScale(Vector3.one * 0.4f, 0.3f, vibrato: 5, elasticity: 0.6f);
             OnLockUnlocked?.Invoke();
 
             Debug.Log($"[LockComponent] 자물쇠 해제! ({gameObject.name})");

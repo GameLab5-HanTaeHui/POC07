@@ -37,6 +37,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using DG.Tweening;
 
 namespace KEY
 {
@@ -220,7 +221,7 @@ namespace KEY
 
             // ④ 피격 플래시
             if (_hitFlashCoroutine != null) StopCoroutine(_hitFlashCoroutine);
-            _hitFlashCoroutine = StartCoroutine(HitFlashRoutine());
+            HitFeedback.EnemyHitPlayer(_spriteRenderer, transform, info.Direction);
 
             // ⑤ 이벤트 발행
             OnDamaged?.Invoke(info);
@@ -274,29 +275,6 @@ namespace KEY
             _isInvincible = true;
             yield return new WaitForSeconds(_iFrameDuration);
             _isInvincible = false;
-        }
-
-        /// <summary>
-        /// 피격 플래시 코루틴.
-        /// iFrame 동안 반투명 깜빡임 반복.
-        /// </summary>
-        private IEnumerator HitFlashRoutine()
-        {
-            float elapsed = 0f;
-            float duration = _iFrameDuration;
-            float interval = _hitFlashInterval;
-
-            while (elapsed < duration)
-            {
-                // 반투명으로 깜빡임 (피격 느낌)
-                _spriteRenderer.color = new Color(1f, 0.4f, 0.4f, 0.5f);
-                yield return new WaitForSeconds(interval);
-                _spriteRenderer.color = Color.white;
-                yield return new WaitForSeconds(interval);
-                elapsed += interval * 2f;
-            }
-
-            _spriteRenderer.color = Color.white;
         }
 
         // ══════════════════════════════════════════════════════
