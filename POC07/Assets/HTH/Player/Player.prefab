@@ -389,6 +389,9 @@ MonoBehaviour:
   _lockLayer:
     serializedVersion: 2
     m_Bits: 131072
+  _shieldLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!1 &4517407843543251923
 GameObject:
   m_ObjectHideFlags: 0
@@ -486,6 +489,7 @@ GameObject:
   - component: {fileID: 1843863384090388974}
   - component: {fileID: 2610524712425543823}
   - component: {fileID: 4397083486284290997}
+  - component: {fileID: 1003960632617719240}
   m_Layer: 10
   m_Name: Player
   m_TagString: Untagged
@@ -757,6 +761,27 @@ MonoBehaviour:
   _hitFlashInterval: 0.08
   _knockbackForce: 6
   _knockbackDecay: 0.8
+--- !u!114 &1003960632617719240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7706058441628014487}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2faa7f3e5959024c8189a6731b66d08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.ObjectFlipController
+  _flipSourceType: 1
+  _flipTargets:
+  - {fileID: 477854357227526693}
+  - {fileID: 4320905082950945593}
+  - {fileID: 1587208408708511654}
+  - {fileID: 1846087167213919240}
+  - {fileID: 7498242107998218889}
+  - {fileID: 1790611535441862770}
+  _invertList: 
 --- !u!1 &7904700805919141896
 GameObject:
   m_ObjectHideFlags: 0
