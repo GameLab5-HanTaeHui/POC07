@@ -9023,6 +9023,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1496568946723596392, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: _shieldLayer.m_Bits
+      value: 262144
+      objectReference: {fileID: 0}
     - target: {fileID: 7706058441628014487, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: m_Name
       value: Player

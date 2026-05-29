@@ -134,6 +134,35 @@ namespace KEY
         }
 
         /// <summary>
+        /// 방향 전환 시 _originLocalPosition.x 동기화.
+        /// ObjectFlipController.OnFlipped() 에서 호출.
+        ///
+        /// [호출 타이밍]
+        ///   ObjectFlipController 가 localPosition.x 를 반전한 직후 호출.
+        ///   PlaySwing() 이 _originLocalPosition 으로 스냅하기 전에
+        ///   현재 방향에 맞는 올바른 원점을 설정.
+        ///
+        /// [왜 필요한가]
+        ///   PlaySwing() 진입 시:
+        ///     transform.localPosition = _originLocalPosition  (스냅)
+        ///   _originLocalPosition 이 구버전(반대 방향)이면
+        ///   Weapon 이 반대 방향으로 튀는 버그 발생.
+        ///   SyncOrigin 으로 항상 현재 방향과 일치하도록 유지.
+        /// </summary>
+        /// <param name="dir">현재 방향. +1 = 오른쪽, -1 = 왼쪽.</param>
+        public void SyncOrigin(float dir)
+        {
+            _originLocalPosition = new Vector3(
+                Mathf.Abs(_originLocalPosition.x) * dir,
+                _originLocalPosition.y,
+                _originLocalPosition.z);
+
+            // 스윙 중이 아닐 때 현재 위치도 즉시 동기화
+            if (!IsSwinging)
+                transform.localPosition = _originLocalPosition;
+        }
+
+        /// <summary>
         /// 스윙 이동 실행.
         /// PlayerWeaponAnimator 에서 콤보 이벤트 수신 시 호출.
         ///
