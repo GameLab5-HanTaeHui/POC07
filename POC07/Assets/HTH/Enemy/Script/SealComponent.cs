@@ -1,6 +1,10 @@
 ﻿// ============================================================
-// SealComponent.cs  v1.2
+// SealComponent.cs  v1.3
 // 적 봉인 상태 관리 컴포넌트 — EnemySealComponent 대체
+//
+// [v1.3 변경]
+//   StartSealVisual() 에 HitFeedback.SealApplied() 호출 추가.
+//   봉인 적용 시 파티클 + ShakeScale 피드백.
 //
 // [v1.2 변경]
 //   Update() Dictionary 순회 중 직접 수정 버그 수정.
@@ -52,7 +56,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 봉인 상태 관리 컴포넌트. (v1.2)
+    /// 적 봉인 상태 관리 컴포넌트. (v1.3)
     ///
     /// ────────────────────────────────────────────────────
     /// [부착 위치]
@@ -331,6 +335,9 @@ namespace KEY
                 _overlayRenderer.color = data.sealColor;
                 _overlayRenderer.enabled = true;
             }
+
+            // HitFeedback — 봉인 적용 파티클 + ShakeScale (v2.0 연동)
+            HitFeedback.SealApplied(_spriteRenderer, transform);
 
             if (_flashCoroutine != null) StopCoroutine(_flashCoroutine);
             if (_spriteRenderer != null)

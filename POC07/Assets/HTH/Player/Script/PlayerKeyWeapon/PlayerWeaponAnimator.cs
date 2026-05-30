@@ -1,24 +1,28 @@
 ﻿// ============================================================
-// PlayerWeaponAnimator.cs  v1.1
+// PlayerWeaponAnimator.cs  v1.2
 // 무기 스윙 이동 연동 컴포넌트
+//
+// [v1.2 변경]
+//   공중 4방향 이벤트 구독 추가 (v0.22 연동).
+//   OnAirAttackSide / OnAirAttackDown / OnAirAttackUp 구독.
+//   방향별 PlaySwing(AttackType) 호출.
 //
 // [v1.1 변경]
 //   Animator Trigger 발행 제거 → MovementAnimator 로 이전.
-//   이 컴포넌트는 PlayerWeaponMover 스윙 이동만 담당.
 //
 // [역할 분리]
 //   MovementAnimator    : 모든 Animator Trigger/Bool/Float 담당
 //   PlayerWeaponAnimator: Weapon 오브젝트 스윙 이동(PlayerWeaponMover) 담당
 //
-// [이벤트 구독 흐름]
-//   RustyKeyWeapon.OnCombo1Started    → PlayerWeaponMover.PlaySwing(Combo1)
-//   RustyKeyWeapon.OnCombo2Started    → PlayerWeaponMover.PlaySwing(Combo2)
-//   RustyKeyWeapon.OnCombo3Started    → PlayerWeaponMover.PlaySwing(Combo3)
-//   RustyKeyWeapon.OnAirAttackStarted → PlayerWeaponMover.PlaySwing(AirAttack)
-//   RustyKeyWeapon.OnComboReset       → PlayerWeaponMover.CancelSwing()
-//
-// [Hierarchy 위치]
-//   Player (루트에 부착)
+// [이벤트 구독 흐름 — v1.2]
+//   RustyKeyWeapon.OnCombo1Started    → PlaySwing(Combo1)
+//   RustyKeyWeapon.OnCombo2Started    → PlaySwing(Combo2)
+//   RustyKeyWeapon.OnCombo3Started    → PlaySwing(Combo3)
+//   RustyKeyWeapon.OnAirAttackStarted → PlaySwing(AirAttack)   ← 하위 호환
+//   RustyKeyWeapon.OnAirAttackSide    → PlaySwing(AirAttack)   ← 수평
+//   RustyKeyWeapon.OnAirAttackDown    → PlaySwing(AirAttackDown) ← 하향
+//   RustyKeyWeapon.OnAirAttackUp      → PlaySwing(AirAttackUp)   ← 상향
+//   RustyKeyWeapon.OnComboReset       → CancelSwing()
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -29,7 +33,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 무기 스윙 이동 연동 컴포넌트. (v1.1)
+    /// 무기 스윙 이동 연동 컴포넌트. (v1.2)
     ///
     /// ────────────────────────────────────────────────────
     /// Animator Trigger 는 MovementAnimator 가 담당.
@@ -55,7 +59,6 @@ namespace KEY
         // 내부 참조
         // ──────────────────────────────────────────
 
-        /// <summary> 현재 구독 중인 무기 컴포넌트. </summary>
         private PlayerWeaponBase _currentWeapon;
 
         // ══════════════════════════════════════════════════════
@@ -102,7 +105,10 @@ namespace KEY
                 rusty.OnCombo1Started += HandleCombo1;
                 rusty.OnCombo2Started += HandleCombo2;
                 rusty.OnCombo3Started += HandleCombo3;
-                rusty.OnAirAttackStarted += HandleAirAttack;
+                rusty.OnAirAttackStarted += HandleAirAttackSide; // 하위 호환
+                rusty.OnAirAttackSide += HandleAirAttackSide;
+                rusty.OnAirAttackDown += HandleAirAttackDown;
+                rusty.OnAirAttackUp += HandleAirAttackUp;
                 rusty.OnComboReset += HandleComboReset;
             }
         }
@@ -114,26 +120,35 @@ namespace KEY
                 rusty.OnCombo1Started -= HandleCombo1;
                 rusty.OnCombo2Started -= HandleCombo2;
                 rusty.OnCombo3Started -= HandleCombo3;
-                rusty.OnAirAttackStarted -= HandleAirAttack;
+                rusty.OnAirAttackStarted -= HandleAirAttackSide;
+                rusty.OnAirAttackSide -= HandleAirAttackSide;
+                rusty.OnAirAttackDown -= HandleAirAttackDown;
+                rusty.OnAirAttackUp -= HandleAirAttackUp;
                 rusty.OnComboReset -= HandleComboReset;
             }
         }
 
         // ══════════════════════════════════════════════════════
-        // 이벤트 핸들러 — 스윙 이동만 처리
+        // 이벤트 핸들러
         // ══════════════════════════════════════════════════════
 
-        /// <summary> Combo1 시작 → 스윙 이동. </summary>
+        /// <summary> Combo1 — 수평 스윙 이동. </summary>
         private void HandleCombo1() => _weaponMover?.PlaySwing(AttackType.Combo1);
 
-        /// <summary> Combo2 시작 → 스윙 이동. </summary>
+        /// <summary> Combo2 — 내리찍기 이동. </summary>
         private void HandleCombo2() => _weaponMover?.PlaySwing(AttackType.Combo2);
 
-        /// <summary> Combo3 시작 → 스윙 이동. </summary>
+        /// <summary> Combo3 — 피니셔 이동 + 히트스탑. </summary>
         private void HandleCombo3() => _weaponMover?.PlaySwing(AttackType.Combo3);
 
-        /// <summary> 공중 공격 시작 → 아래 스윙 이동. </summary>
-        private void HandleAirAttack() => _weaponMover?.PlaySwing(AttackType.AirAttack);
+        /// <summary> 공중 수평 공격 이동. </summary>
+        private void HandleAirAttackSide() => _weaponMover?.PlaySwing(AttackType.AirAttack);
+
+        /// <summary> 공중 하향 내리찍기 이동. </summary>
+        private void HandleAirAttackDown() => _weaponMover?.PlaySwing(AttackType.AirAttackDown);
+
+        /// <summary> 공중 상향 공격 이동. </summary>
+        private void HandleAirAttackUp() => _weaponMover?.PlaySwing(AttackType.AirAttackUp);
 
         /// <summary> 콤보 리셋 → 스윙 취소 + 원점 복귀. </summary>
         private void HandleComboReset() => _weaponMover?.CancelSwing();

@@ -213,13 +213,11 @@ namespace KEY
         {
             _isUnlocked = true;
             if (_collider != null) _collider.enabled = false;
-            // 해제 이펙트 — 노란색 확대 후 원복
-            DOTween.Kill(transform);
-            DOTween.Kill(_spriteRenderer);
-            _spriteRenderer.color = _unlockedColor;
-            transform.DOPunchScale(Vector3.one * 0.4f, 0.3f, vibrato: 5, elasticity: 0.6f);
-            OnLockUnlocked?.Invoke();
 
+            // 해제 피드백 — HitFeedback 에 위임 (파티클 + DOTween)
+            HitFeedback.LockUnlocked(_spriteRenderer, transform);
+
+            OnLockUnlocked?.Invoke();
             Debug.Log($"[LockComponent] 자물쇠 해제! ({gameObject.name})");
         }
 

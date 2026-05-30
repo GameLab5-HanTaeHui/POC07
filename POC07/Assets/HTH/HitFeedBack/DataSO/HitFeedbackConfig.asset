@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2bb98b8888b26ba4bbbb5157f9c3ad32, type: 3}
+  m_Name: HitFeedbackConfig
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.HitFeedbackConfig
+  fxHitEnemy: {fileID: 2474614873900876866, guid: 06c2cec21bd45594aa6dd610b7e7cb69, type: 3}
+  fxHitLock: {fileID: 2146958112594197085, guid: ecb75c57c8281034ea6d52c5e4477949, type: 3}
+  fxUnlockLock: {fileID: 6961386256556069564, guid: 4e37bbde7ff977e4fb50c605eba62466, type: 3}
+  fxBlockedShield: {fileID: 7036025762762129311, guid: a0502e1d5feb7e84fb79e0d3d82c1218, type: 3}
+  fxSealApplied: {fileID: 6082806410809685636, guid: 64369b839475e7d47ab93464858d1875, type: 3}
+  lockHitScaleMultiplier: 1.5

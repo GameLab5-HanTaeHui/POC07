@@ -150,6 +150,7 @@ namespace KEY
         private bool _jumpBlocked;
         private bool _moveBlocked;
         private bool _dashBlocked;
+        private float _verticalInput;
         private bool _isKeySwapMode;
 
         // ──────────────────────────────────────────
@@ -222,6 +223,12 @@ namespace KEY
         // ──────────────────────────────────────────
         // 프로퍼티
         // ──────────────────────────────────────────
+
+        /// <summary>
+        /// 현재 수직 입력값.
+        /// +1 = ↑ 누름 / -1 = ↓ 누름 / 0 = 입력 없음.
+        /// </summary>
+        public float VerticalInput => _verticalInput;
 
         /// <summary> 현재 KeySwap 모드 여부. </summary>
         public bool IsKeySwapMode => _isKeySwapMode;
@@ -395,10 +402,10 @@ namespace KEY
             };
 
             // 누름(+1) / 뗌(0) 모두 발행 — PlayerChargeAttack 이 상태 유지
-            _actionAimUp.performed += _ => OnAimAdjust?.Invoke(+1f);
-            _actionAimUp.canceled += _ => OnAimAdjust?.Invoke(0f);
-            _actionAimDown.performed += _ => OnAimAdjust?.Invoke(-1f);
-            _actionAimDown.canceled += _ => OnAimAdjust?.Invoke(0f);
+            _actionAimUp.performed += _ => { OnAimAdjust?.Invoke(+1f); _verticalInput = +1f; };
+            _actionAimUp.canceled += _ => { OnAimAdjust?.Invoke(0f); if (_verticalInput > 0f) _verticalInput = 0f; };
+            _actionAimDown.performed += _ => { OnAimAdjust?.Invoke(-1f); _verticalInput = -1f; };
+            _actionAimDown.canceled += _ => { OnAimAdjust?.Invoke(0f); if (_verticalInput < 0f) _verticalInput = 0f; };
         }
 
         // ══════════════════════════════════════════════════════

@@ -46,9 +46,16 @@ namespace KEY
         /// <summary> 3단 콤보 피니셔. </summary>
         Combo3,
 
-        /// <summary> 공중 공격 (내리찍기). </summary>
+        /// <summary> 공중 수평 공격. (기존 AirAttack — 하위 호환 유지) </summary>
         AirAttack,
+
+        /// <summary> 공중 하향 내리찍기. ↓ + 좌우 입력. </summary>
+        AirAttackDown,
+
+        /// <summary> 공중 상향 공격. ↑ + 좌우 입력. </summary>
+        AirAttackUp,
     }
+
 
     // ──────────────────────────────────────────
     // 데미지 정보 구조체

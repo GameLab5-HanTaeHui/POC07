@@ -1,34 +1,31 @@
 ﻿// ============================================================
-// PlayerWeaponMover.cs  v1.1
+// PlayerWeaponMover.cs  v1.3
 // Weapon 오브젝트 스윙 이동 전담 컴포넌트
 //
+// [v1.3 변경 — 콤보별 DOTween 임팩트 차별화]
+//
+//   ① 콤보 단계별 스윙 임팩트 추가
+//       Combo1 : DOPunchPosition X(수평) + DOPunchRotation Z
+//       Combo2 : DOPunchPosition Y(하향) + DOShakeScale
+//       Combo3 : 선딜레이 0.06초 + DOPunchPosition X(강) + 히트스탑
+//       AirSide: DOPunchPosition X + DOPunchRotation Z(소)
+//       AirDown: DOPunchPosition Y(강하향) + DOShakeScale
+//       AirUp  : DOPunchPosition Y(상향) + DOPunchRotation Z
+//
+//   ② 히트스탑 구현
+//       Combo3 히트박스 활성 직전 0.06초 동안 Time.timeScale = 0 처리.
+//       DOTween.To 로 timeScale 제어. SetUpdate(true) 로 언스케일드 타임 사용.
+//
+//   ③ AttackType 확장
+//       AirSide / AirDown / AirUp 분기 추가.
+//       RustyKeyWeapon v1.5 의 4방향 이벤트와 연동.
+//
+// [v1.2 변경]
+//   SyncOrigin(dir) 추가 — ObjectFlipController 에서 호출.
+//   왼쪽 공격 방향 튀는 버그 수정.
+//
 // [v1.1 변경]
-//   ① PlayerMover.OnFlipped 구독 추가
-//       - 방향 전환 시 _originLocalPosition.x 부호 반전
-//       - 스윙 진행 중이면 CancelSwing() 으로 즉시 중단 후 위치 보정
-//       - 이로써 왼쪽을 바라볼 때도 무기가 항상 캐릭터 앞쪽에 위치
-//
-// [역할]
-//   공격 시 Weapon 오브젝트(로컬 Transform)를
-//   DOTween 으로 앞으로 뻗었다 원점으로 복귀시킴.
-//   히트박스가 Weapon 의 자식이므로 자동으로 같이 이동.
-//
-// [이동 흐름]
-//   PlaySwing() 호출
-//     1. 진행 중인 스윙 즉시 Kill + 원점 복귀
-//     2. 앞으로 뻗기  : localPosition → offset  (Ease.OutQuart, swingDuration)
-//     3. 히트박스 구간 유지 (hitboxDuration - swingDuration)
-//     4. 원점 복귀    : localPosition → _originLocalPosition (Ease.InQuart, returnDuration)
-//
-// [좌우 방향 처리]
-//   PlayerMover.OnFlipped 수신 시 _originLocalPosition.x 부호 반전.
-//   PlaySwing 의 GetSwingOffset 은 FacingDirection 으로 X 부호 결정.
-//   두 값이 항상 일치하므로 스윙 방향과 원점 위치가 동기화됨.
-//
-// [Hierarchy 위치]
-//   Player
-//   └── Weapon          ← 이 오브젝트에 부착
-//         └── Hitbox_*  ← 자동으로 같이 이동
+//   PlayerMover.OnFlipped 구독 추가.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -41,53 +38,52 @@ using DG.Tweening;
 namespace KEY
 {
     /// <summary>
-    /// Weapon 오브젝트 스윙 이동 전담 컴포넌트. (v1.1)
+    /// Weapon 오브젝트 스윙 이동 전담 컴포넌트. (v1.3)
     ///
     /// ────────────────────────────────────────────────────
-    /// [WeaponAnimator 에서의 호출]
-    ///   _weaponMover.PlaySwing(AttackType.Combo1);
-    ///   _weaponMover.PlaySwing(AttackType.AirAttack);
+    /// [콤보별 임팩트]
+    ///   Combo1 : 수평 스윙 — PunchPosition(X) + PunchRotation(Z)
+    ///   Combo2 : 내리찍기 — PunchPosition(Y하) + ShakeScale
+    ///   Combo3 : 피니셔   — 히트스탑(0.06초) + PunchPosition(X강) + ShakeScale
+    ///   AirSide: 수평 공격 — PunchPosition(X) + PunchRotation(Z소)
+    ///   AirDown: 내리찍기  — PunchPosition(Y강하) + ShakeScale
+    ///   AirUp  : 상향 공격 — PunchPosition(Y상) + PunchRotation(Z역)
     ///
-    /// [PlayerMover.OnFlipped 구독 흐름]
-    ///   PlayerMover.FlipSprite() → OnFlipped(newDir)
-    ///     → HandleFlipped(newDir)
-    ///         → _originLocalPosition.x = |x| * newDir
-    ///         → 스윙 중이면 CancelSwing() 으로 즉시 원점 복귀
+    /// [히트스탑]
+    ///   Combo3 전용. Time.timeScale 을 0.05초 동안 0 으로 설정 후 복원.
+    ///   DOTween SetUpdate(true) 로 언스케일드 타임에서 동작.
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class PlayerWeaponMover : MonoBehaviour
     {
         // ──────────────────────────────────────────
+        // Inspector
+        // ──────────────────────────────────────────
+
+        [Header("── 히트스탑 설정 ──────────────────────")]
+
+        /// <summary>
+        /// Combo3 피니셔 히트스탑 지속 시간 (초, 실제 시간).
+        /// 0 = 히트스탑 없음.
+        /// </summary>
+        [Tooltip("Combo3 히트스탑 지속 시간 (초). 0 = 비활성.")]
+        [Range(0f, 0.2f)]
+        [SerializeField] private float _hitStopDuration = 0.06f;
+
+        // ──────────────────────────────────────────
         // 내부 참조
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 현재 장착된 열쇠 데이터.
-        /// WeaponKeyController 가 열쇠 교체 시 SetKeyData() 로 주입.
-        /// </summary>
+        /// <summary> 현재 장착된 열쇠 데이터. </summary>
         private KeyDataSO _keyData;
 
-        /// <summary>
-        /// 진행 중인 스윙 Tween.
-        /// 새 공격 시작 또는 방향 전환 시 Kill() 후 재시작.
-        /// </summary>
         private Tween _swingTween;
-
-        /// <summary>
-        /// 진행 중인 스윙 시퀀스 코루틴.
-        /// </summary>
         private Coroutine _swingCoroutine;
 
         /// <summary>
         /// Weapon 오브젝트의 로컬 원점 위치.
         /// Awake 에서 초기값 캐싱.
-        /// OnFlipped 수신 시 X 부호가 반전됨.
-        ///
-        /// [왜 X 만 바꾸는가?]
-        ///   Weapon 은 Player 의 자식이므로 localPosition.x 의 부호가
-        ///   캐릭터 기준 좌/우를 결정함.
-        ///   PlayerMover 가 SpriteRenderer.flipX 로 스프라이트를 반전하므로
-        ///   Weapon 의 로컬 X 좌표도 같이 반전해야 시각적으로 앞쪽에 위치.
+        /// SyncOrigin / OnFlipped 수신 시 X 부호가 반전됨.
         /// </summary>
         private Vector3 _originLocalPosition;
 
@@ -102,21 +98,17 @@ namespace KEY
         // Unity 라이프사이클
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 씬 배치 시 초기 로컬 위치를 원점으로 캐싱.
-        /// PlayerMover.OnFlipped 구독 시작.
-        /// </summary>
         private void Awake()
         {
             _originLocalPosition = transform.localPosition;
         }
 
-        /// <summary>
-        /// 이벤트 구독 해제 및 진행 중인 Tween Kill.
-        /// </summary>
         private void OnDestroy()
         {
             _swingTween?.Kill();
+            // 히트스탑 중 파괴 시 TimeScale 복원
+            if (Mathf.Approximately(Time.timeScale, 0f))
+                Time.timeScale = 1f;
         }
 
         // ══════════════════════════════════════════════════════
@@ -125,31 +117,14 @@ namespace KEY
 
         /// <summary>
         /// 열쇠 데이터 주입.
-        /// WeaponKeyController.ActivateWeapon() 에서 호출.
+        /// PlayerWeaponController.ActivateWeapon() 에서 호출.
         /// </summary>
-        /// <param name="keyData">장착된 열쇠 데이터</param>
-        public void SetKeyData(KeyDataSO keyData)
-        {
-            _keyData = keyData;
-        }
+        public void SetKeyData(KeyDataSO keyData) => _keyData = keyData;
 
         /// <summary>
         /// 방향 전환 시 _originLocalPosition.x 동기화.
         /// ObjectFlipController.OnFlipped() 에서 호출.
-        ///
-        /// [호출 타이밍]
-        ///   ObjectFlipController 가 localPosition.x 를 반전한 직후 호출.
-        ///   PlaySwing() 이 _originLocalPosition 으로 스냅하기 전에
-        ///   현재 방향에 맞는 올바른 원점을 설정.
-        ///
-        /// [왜 필요한가]
-        ///   PlaySwing() 진입 시:
-        ///     transform.localPosition = _originLocalPosition  (스냅)
-        ///   _originLocalPosition 이 구버전(반대 방향)이면
-        ///   Weapon 이 반대 방향으로 튀는 버그 발생.
-        ///   SyncOrigin 으로 항상 현재 방향과 일치하도록 유지.
         /// </summary>
-        /// <param name="dir">현재 방향. +1 = 오른쪽, -1 = 왼쪽.</param>
         public void SyncOrigin(float dir)
         {
             _originLocalPosition = new Vector3(
@@ -157,7 +132,6 @@ namespace KEY
                 _originLocalPosition.y,
                 _originLocalPosition.z);
 
-            // 스윙 중이 아닐 때 현재 위치도 즉시 동기화
             if (!IsSwinging)
                 transform.localPosition = _originLocalPosition;
         }
@@ -165,27 +139,20 @@ namespace KEY
         /// <summary>
         /// 스윙 이동 실행.
         /// PlayerWeaponAnimator 에서 콤보 이벤트 수신 시 호출.
-        ///
-        /// [AttackType 별 이동 방향]
-        ///   Combo1 ~ Combo3 : FacingDirection(X) 앞으로 swingDistance
-        ///   AirAttack       : 아래(Y 음수) + 소량 X 전진
         /// </summary>
-        /// <param name="attackType">공격 유형 — 이동 방향 결정</param>
         public void PlaySwing(AttackType attackType)
         {
             if (_keyData == null) return;
 
-            // 진행 중인 스윙 즉시 중단
             _swingTween?.Kill();
             if (_swingCoroutine != null) StopCoroutine(_swingCoroutine);
 
-            // 원점으로 즉시 스냅 후 새 스윙 시작
             transform.localPosition = _originLocalPosition;
             _swingCoroutine = StartCoroutine(SwingRoutine(attackType));
         }
 
         /// <summary>
-        /// 진행 중인 스윙을 즉시 중단하고 원점으로 복귀.
+        /// 진행 중인 스윙 즉시 중단 + 원점 복귀.
         /// 콤보 리셋 / 무기 교체 / 방향 전환 시 호출.
         /// </summary>
         public void CancelSwing()
@@ -205,32 +172,40 @@ namespace KEY
         /// 스윙 시퀀스 코루틴.
         ///
         /// [흐름]
-        ///   1. 앞으로 뻗기  (swingDuration, Ease.OutQuart)
-        ///   2. 히트박스 유지 (hitboxDuration - swingDuration)
-        ///   3. 원점 복귀    (returnDuration, Ease.InQuart)
+        ///   1. (Combo3만) 히트스탑 0.06초
+        ///   2. 앞으로 뻗기 + DOTween 임팩트 (swingDuration)
+        ///   3. 히트박스 유지 (hitboxDuration - swingDuration)
+        ///   4. 원점 복귀 (returnDuration)
         /// </summary>
-        /// <param name="attackType">공격 유형</param>
         private IEnumerator SwingRoutine(AttackType attackType)
         {
             IsSwinging = true;
 
-            Vector3 swingOffset = GetSwingOffset(attackType);
-            Vector3 targetPos = _originLocalPosition + swingOffset;
+            float facing = PlayerMovementFacade.Instance?.FacingDirection ?? 1f;
 
-            // ① 앞으로 뻗기
+            // ── ① Combo3 히트스탑 ──────────────────────────────
+            if (attackType == AttackType.Combo3 && _hitStopDuration > 0f)
+                yield return StartCoroutine(HitStopRoutine(_hitStopDuration));
+
+            // ── ② 앞으로 뻗기 + 임팩트 DOTween ──────────────────
+            Vector3 targetPos = _originLocalPosition + GetSwingOffset(attackType, facing);
+
             bool swingDone = false;
             _swingTween = transform.DOLocalMove(targetPos, _keyData.swingDuration)
                 .SetEase(Ease.OutQuart)
                 .OnComplete(() => swingDone = true);
 
+            // 임팩트 DOTween (이동과 동시)
+            ApplySwingImpact(attackType, facing);
+
             yield return new WaitUntil(() => swingDone);
 
-            // ② 히트박스 유지 구간
+            // ── ③ 히트박스 유지 구간 ──────────────────────────────
             float holdTime = Mathf.Max(0f, _keyData.hitboxDuration - _keyData.swingDuration);
             if (holdTime > 0f)
                 yield return new WaitForSeconds(holdTime);
 
-            // ③ 원점 복귀
+            // ── ④ 원점 복귀 ──────────────────────────────────────
             bool returnDone = false;
             _swingTween = transform.DOLocalMove(_originLocalPosition, _keyData.returnDuration)
                 .SetEase(Ease.InQuart)
@@ -242,34 +217,142 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
-        // 보조
+        // 임팩트 DOTween (v1.3 신규)
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 공격 타입별 DOTween 임팩트 적용.
+        /// PlaySwing 이동과 동시에 실행.
+        ///
+        /// [Combo1] 수평 스윙 — PunchPosition(X) + PunchRotation(Z)
+        /// [Combo2] 내리찍기 — PunchPosition(Y하) + ShakeScale
+        /// [Combo3] 피니셔   — PunchPosition(X강) + ShakeScale
+        /// [AirSide] 수평    — PunchPosition(X) + PunchRotation(Z소)
+        /// [AirDown] 내리찍기 — PunchPosition(Y강하) + ShakeScale
+        /// [AirUp]  상향     — PunchPosition(Y상) + PunchRotation(Z역)
+        /// </summary>
+        private void ApplySwingImpact(AttackType attackType, float facing)
+        {
+            DOTween.Kill(transform, false); // 기존 임팩트 Kill (이동 Tween 제외)
+
+            switch (attackType)
+            {
+                case AttackType.Combo1:
+                    // 수평 스윙 — 전방 펀치 + 약한 회전
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.18f, 0f, 0f),
+                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
+                    transform.DOPunchRotation(
+                        new Vector3(0f, 0f, facing * -8f),
+                        duration: 0.15f, vibrato: 2, elasticity: 0.4f);
+                    break;
+
+                case AttackType.Combo2:
+                    // 내리찍기 — 하향 펀치 + 스케일 흔들림
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.1f, -0.2f, 0f),
+                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
+                    transform.DOPunchScale(
+                        new Vector3(0.15f, -0.1f, 0f),
+                        duration: 0.14f, vibrato: 3, elasticity: 0.4f);
+                    break;
+
+                case AttackType.Combo3:
+                    // 피니셔 — 강한 전방 펀치 + 스케일 흔들림
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.28f, 0f, 0f),
+                        duration: 0.15f, vibrato: 3, elasticity: 0.2f);
+                    transform.DOPunchScale(
+                        new Vector3(0.2f, 0.2f, 0f),
+                        duration: 0.18f, vibrato: 4, elasticity: 0.5f);
+                    break;
+
+                case AttackType.AirAttack: // AirSide (기본값)
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.15f, 0f, 0f),
+                        duration: 0.1f, vibrato: 2, elasticity: 0.3f);
+                    transform.DOPunchRotation(
+                        new Vector3(0f, 0f, facing * -5f),
+                        duration: 0.12f, vibrato: 2, elasticity: 0.4f);
+                    break;
+
+                // ── 공중 4방향 (v0.22 연동) ──────────────────────
+                case AttackType.AirAttackDown:
+                    // 내리찍기 — 강한 하향 + 스케일 진동
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.08f, -0.3f, 0f),
+                        duration: 0.13f, vibrato: 3, elasticity: 0.2f);
+                    transform.DOPunchScale(
+                        new Vector3(0.1f, 0.25f, 0f),
+                        duration: 0.16f, vibrato: 4, elasticity: 0.4f);
+                    break;
+
+                case AttackType.AirAttackUp:
+                    // 상향 공격 — 상방 펀치 + 역회전
+                    transform.DOPunchPosition(
+                        new Vector3(facing * 0.08f, 0.25f, 0f),
+                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
+                    transform.DOPunchRotation(
+                        new Vector3(0f, 0f, facing * 10f),
+                        duration: 0.15f, vibrato: 2, elasticity: 0.4f);
+                    break;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 히트스탑 코루틴 (v1.3 신규)
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 히트스탑: TimeScale 을 0 으로 설정 → duration 후 복원.
+        /// DOTween.SetUpdate(true) 로 언스케일드 타임 사용.
+        /// Combo3 전용.
+        /// </summary>
+        private IEnumerator HitStopRoutine(float duration)
+        {
+            Time.timeScale = 0f;
+
+            // WaitForSecondsRealtime — TimeScale 0 에서도 동작
+            yield return new WaitForSecondsRealtime(duration);
+
+            Time.timeScale = 1f;
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 스윙 오프셋 계산
         // ══════════════════════════════════════════════════════
 
         /// <summary>
         /// AttackType 별 스윙 오프셋 계산.
         ///
-        /// [지상 콤보]
-        ///   FacingDirection × swingDistance → X 방향 앞으로
-        ///
-        /// [공중 공격]
-        ///   Y 음수(아래) + 소량 X 전진
+        /// [지상 콤보]   FacingDirection × swingDistance → X 전진
+        /// [AirSide]     X 전진 + 소량 Y 하향
+        /// [AirDown]     강한 Y 하향 + 소량 X 전진
+        /// [AirUp]       Y 상향 + 소량 X 전진
         /// </summary>
-        /// <param name="attackType">공격 유형</param>
-        /// <returns>원점 기준 로컬 오프셋</returns>
-        private Vector3 GetSwingOffset(AttackType attackType)
+        private Vector3 GetSwingOffset(AttackType attackType, float facing)
         {
-            float facing = PlayerMovementFacade.Instance?.FacingDirection ?? 1f;
-
             switch (attackType)
             {
-                case AttackType.AirAttack:
+                case AttackType.AirAttack:   // AirSide
                     return new Vector3(
-                        facing * _keyData.swingDistance * 0.3f,
+                        facing * _keyData.swingDistance * 0.5f,
+                        -_keyData.airSwingDistance * 0.4f,
+                        0f);
+
+                case AttackType.AirAttackDown:
+                    return new Vector3(
+                        facing * _keyData.swingDistance * 0.2f,
                         -_keyData.airSwingDistance,
                         0f);
 
-                default:
-                    // Combo1 / Combo2 / Combo3 동일 방향, 동일 거리
+                case AttackType.AirAttackUp:
+                    return new Vector3(
+                        facing * _keyData.swingDistance * 0.2f,
+                        _keyData.airSwingDistance,
+                        0f);
+
+                default: // Combo1 / Combo2 / Combo3
                     return new Vector3(facing * _keyData.swingDistance, 0f, 0f);
             }
         }
@@ -278,9 +361,9 @@ namespace KEY
         // Gizmos
         // ══════════════════════════════════════════════════════
 
+#if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-            // 현재 원점 위치 표시
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(
                 transform.parent != null
@@ -288,5 +371,6 @@ namespace KEY
                     : transform.position,
                 0.08f);
         }
+#endif
     }
 }

@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// RustyKeyWeapon.cs  v1.3
+// RustyKeyWeapon.cs  v1.5
 // 녹슨 열쇠 무기 — Animator 직접 폴링 방식
 //
 // [v1.2 → v1.3 핵심 변경]
@@ -137,6 +137,15 @@ namespace KEY
         /// <summary> 공중 공격 시작 시 발행. MovementAnimator → AirAttack Trigger. </summary>
         public event System.Action OnAirAttackStarted;
 
+        /// <summary> 공중 수평 공격. MovementAnimator → AirAttack Trigger. </summary>
+        public event System.Action OnAirAttackSide;
+
+        /// <summary> 공중 하향 내리찍기. MovementAnimator → AirAttackDown Trigger. </summary>
+        public event System.Action OnAirAttackDown;
+
+        /// <summary> 공중 상향 공격. MovementAnimator → AirAttackUp Trigger. </summary>
+        public event System.Action OnAirAttackUp;
+
         /// <summary> 콤보 리셋 시 발행. PlayerWeaponAnimator → 스윙 취소. </summary>
         public event System.Action OnComboReset;
 
@@ -208,7 +217,15 @@ namespace KEY
             if (_comboCoroutine != null)
                 StopCoroutine(_comboCoroutine);
 
-            _comboCoroutine = StartCoroutine(ExecuteAirAttack());
+            // 수직 입력으로 방향 판단
+            float vertInput = InputManager.Instance?.VerticalInput ?? 0f;
+
+            PlayerAirAttackDirection dir;
+            if (vertInput < -0.3f) dir = PlayerAirAttackDirection.Down;
+            else if (vertInput > 0.3f) dir = PlayerAirAttackDirection.Up;
+            else dir = PlayerAirAttackDirection.Side;
+
+            _comboCoroutine = StartCoroutine(ExecuteAirAttack(dir));
         }
 
         /// <summary>
@@ -317,13 +334,38 @@ namespace KEY
         /// <summary>
         /// 공중 내리찍기 실행. hitboxDuration 기준 (공중 전용).
         /// </summary>
-        private IEnumerator ExecuteAirAttack()
+        private IEnumerator ExecuteAirAttack(PlayerAirAttackDirection dir = PlayerAirAttackDirection.Side)
         {
             _isAttacking = true;
-            OnAirAttackStarted?.Invoke();
+
+            // 방향별 이벤트 발행 (MovementAnimator → Animator Trigger)
+            switch (dir)
+            {
+                case PlayerAirAttackDirection.Down:
+                    OnAirAttackDown?.Invoke();
+                    Debug.Log("[RustyKeyWeapon] 공중 하향 공격");
+                    break;
+                case PlayerAirAttackDirection.Up:
+                    OnAirAttackUp?.Invoke();
+                    Debug.Log("[RustyKeyWeapon] 공중 상향 공격");
+                    break;
+                default: // Side
+                    OnAirAttackSide?.Invoke();
+                    OnAirAttackStarted?.Invoke(); // 하위 호환
+                    Debug.Log("[RustyKeyWeapon] 공중 수평 공격");
+                    break;
+            }
+
+            // 방향별 AttackType 및 DamageInfo
+            AttackType attackType = dir switch
+            {
+                PlayerAirAttackDirection.Down => AttackType.AirAttackDown,
+                PlayerAirAttackDirection.Up => AttackType.AirAttackUp,
+                _ => AttackType.AirAttack,
+            };
 
             float dmg = _keyData.baseDamage * _keyData.airAttackMultiplier;
-            DamageInfo info = BuildDamageInfo(dmg, AttackType.AirAttack);
+            DamageInfo info = BuildDamageInfo(dmg, attackType);
             _hitboxManager.EnableHitbox(PlayerWeaponHitboxManager.HitboxAirAttack, info);
 
             yield return new WaitForSeconds(_keyData.hitboxDuration);
@@ -412,10 +454,23 @@ namespace KEY
         private DamageInfo BuildDamageInfo(float amount, AttackType attackType)
         {
             float facing = PlayerMovementFacade.Instance?.FacingDirection ?? 1f;
-            Vector2 attackDir = new Vector2(facing, 0f);
+            Vector2 attackDir;
 
-            if (attackType == AttackType.AirAttack)
-                attackDir = new Vector2(facing * 0.5f, -1f).normalized;
+            switch (attackType)
+            {
+                case AttackType.AirAttackDown:
+                    attackDir = new Vector2(facing * 0.3f, -1f).normalized;
+                    break;
+                case AttackType.AirAttackUp:
+                    attackDir = new Vector2(facing * 0.3f, +1f).normalized;
+                    break;
+                case AttackType.AirAttack: // Side
+                    attackDir = new Vector2(facing * 0.8f, -0.3f).normalized;
+                    break;
+                default: // 지상 콤보
+                    attackDir = new Vector2(facing, 0f);
+                    break;
+            }
 
             return new DamageInfo(
                 attackerPosition: transform.position,
