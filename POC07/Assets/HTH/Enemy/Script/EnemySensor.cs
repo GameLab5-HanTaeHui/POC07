@@ -1,6 +1,11 @@
 ﻿// ============================================================
-// EnemySensor.cs  v2.0
+// EnemySensor.cs  v2.1
 // 적 공용 감지 컴포넌트 — 리모델링
+//
+// [v2.1 변경]
+//   CheckMeleeRange() 추가.
+//   EnemyAI 에서 Dash 봉인 중 근접 공격 사정거리 체크용.
+//   EnemyDataSO.meleeAttackRange 기준 OverlapCircle.
 //
 // [v2.0 리모델링 변경]
 //
@@ -33,7 +38,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 공용 감지 컴포넌트. (v2.0)
+    /// 적 공용 감지 컴포넌트. (v2.1)
     ///
     /// ────────────────────────────────────────────────────
     /// [감지 메서드 목록]
@@ -42,6 +47,7 @@ namespace KEY
     ///   CheckCliff()       : 발 앞 하향 Raycast — 낭떠러지 감지
     ///   CheckChaseRange()  : 원형 OverlapCircle — 추격 유지 범위
     ///   CheckChargeRange() : 원형 OverlapCircle — 차징 발동 범위
+    ///   CheckMeleeRange()  : 원형 OverlapCircle — 근접 공격 사정거리 (v2.1)
     ///
     /// [EnemyAI 에서 사용 방식]
     ///   Patrol 상태 : CheckWall(), CheckCliff(), CheckPatrolSight()
@@ -199,6 +205,24 @@ namespace KEY
             return Physics2D.OverlapCircle(
                 transform.position,
                 _data.chargeDetectRange,
+                _data.playerLayer) != null;
+        }
+
+        /// <summary>
+        /// 원형 OverlapCircle — 근접 공격 사정거리. (v2.1 추가)
+        /// Dash 봉인 중 근접 공격 가능 여부 판단.
+        /// EnemyDataSO.meleeAttackRange 기준.
+        ///
+        /// [EnemyAI 사용처]
+        ///   OnEnterAttack() 에서 Dash 봉인 중 근접 범위 체크.
+        /// </summary>
+        public bool CheckMeleeRange()
+        {
+            if (_data == null) return false;
+
+            return Physics2D.OverlapCircle(
+                transform.position,
+                _data.meleeAttackRange,
                 _data.playerLayer) != null;
         }
 

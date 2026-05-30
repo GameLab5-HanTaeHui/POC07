@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// EnemyDataSO.cs  v4.0
+// EnemyDataSO.cs  v4.2
 // 적 공통 수치 ScriptableObject — 방향 C 적용
 //
 // [v4.0 변경 — 공통 수치만 유지]
@@ -58,7 +58,7 @@ namespace KEY
     }
 
     /// <summary>
-    /// 적 공통 수치 ScriptableObject. (v4.0)
+    /// 적 공통 수치 ScriptableObject. (v4.2)
     ///
     /// ────────────────────────────────────────────────────
     /// [포함 범위 — 공통 수치만]
@@ -231,6 +231,32 @@ namespace KEY
         // AI
         // ──────────────────────────────────────────
 
+        [Header("── 근접 공격 (Dash 봉인 시 대체 공격) ──────────────────────")]
+
+        /// <summary>
+        /// 근접 1타 피해량.
+        /// Dash 봉인 중 차징 대신 사용하는 근접 공격.
+        /// 차징보다 약하게 설정 권장.
+        /// </summary>
+        [Tooltip("근접 1타 피해량. Dash 봉인 시 대체 공격. 권장: 8~15.")]
+        [Min(0f)]
+        [SerializeField] public float meleeAttackDamage = 10f;
+
+        /// <summary>
+        /// 근접 1타 쿨타임 (초).
+        /// </summary>
+        [Tooltip("근접 공격 쿨타임 (초). 권장: 1.5~3.0.")]
+        [Min(0.1f)]
+        [SerializeField] public float meleeAttackCooldown = 2.0f;
+
+        /// <summary>
+        /// 근접 공격 사정거리 (units).
+        /// 기사 위치 기준 전방 이 범위 안에 플레이어가 있으면 공격.
+        /// </summary>
+        [Tooltip("근접 공격 사정거리. 권장: 1.5~2.5.")]
+        [Min(0.1f)]
+        [SerializeField] public float meleeAttackRange = 2.0f;
+
         [Header("── AI ──────────────────────")]
 
         /// <summary>
@@ -241,6 +267,17 @@ namespace KEY
         [Tooltip("그로기 지속 시간. 플레이어 공략 타이밍. 권장: 2.0~3.5.")]
         [Min(0.5f)]
         [SerializeField] public float groggyDuration = 2.5f;
+
+        /// <summary>
+        /// Chase 중 방향 전환 쿨타임 (초).
+        /// 이 시간이 지나야 UpdateChaseDirection() 에서 방향 전환 가능.
+        /// 플레이어가 적 등 뒤를 노릴 수 있는 시간을 확보.
+        /// Groggy 종료 시 TurnTowardPlayer() 는 이 쿨타임을 무시하고 즉시 전환.
+        /// 권장: 1.5~3.0
+        /// </summary>
+        [Tooltip("Chase 중 방향 전환 쿨타임 (초). 플레이어 등 뒤 공략 시간 확보. 권장: 1.5~3.0.")]
+        [Min(0f)]
+        [SerializeField] public float flipCooldown = 2.0f;
 
         // ──────────────────────────────────────────
         // 레이어

@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// EnemyAI.cs  v5.1
+// EnemyAI.cs  v5.0
 // 적 공용 AI — 리모델링 (기사형 차징 전용)
 //
 // [v5.0 리모델링 변경]
@@ -21,9 +21,6 @@
 //       근접 공격 완료 핸들러 불필요.
 //       차징 완료 or 벽 충돌 → EnterGroggy() 만 남음.
 //
-// [v5.1 변경]
-//   SealComponent → SealComponent 로 교체.
-//
 // [v4.4 변경]
 //   FlipAttackHitboxes() 제거 → OnFlipped 이벤트 발행.
 //
@@ -41,7 +38,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 적 공용 AI 컴포넌트. (v5.1)
+    /// 적 공용 AI 컴포넌트. (v5.0)
     ///
     /// ────────────────────────────────────────────────────
     /// [상태 전환 다이어그램]
@@ -103,6 +100,7 @@ namespace KEY
         private Rigidbody2D _rigid2D;
         private SpriteRenderer _spriteRenderer;
         private SealComponent _sealComponent;
+        private EnemyKnightAttack _meleeAttack;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -110,6 +108,7 @@ namespace KEY
 
         private AIState _currentState = AIState.Patrol;
         private float _facingDirection = 1f;
+        private float _flipCooldownTimer;
         private Coroutine _idleCoroutine;
         private Coroutine _groggyCoroutine;
 
@@ -148,6 +147,7 @@ namespace KEY
             _spriteRenderer = GetComponent<SpriteRenderer>();
             _sealComponent = GetComponent<SealComponent>();
             _chargeAttack = GetComponent<EnemyKnightChargeAttack>();
+            _meleeAttack = GetComponent<EnemyKnightAttack>();
 
             // DataSO 는 EnemyBase 에서 취득
             var enemyBase = GetComponent<EnemyBase>();
@@ -175,6 +175,12 @@ namespace KEY
                 _chargeAttack.OnAttackFinished += HandleChargeAttackFinished;
             }
 
+            if (_meleeAttack != null)
+            {
+                _meleeAttack.SetData(_settings);
+                _meleeAttack.OnAttackFinished += HandleMeleeAttackFinished;
+            }
+
             // Dummy 타입은 AI 비활성
             if (_settings.enemyType == EnemyType.Dummy ||
                 _settings.enemyType == EnemyType.DummyLocked)
@@ -187,9 +193,16 @@ namespace KEY
         {
             if (_chargeAttack != null)
                 _chargeAttack.OnAttackFinished -= HandleChargeAttackFinished;
+            if (_meleeAttack != null)
+                _meleeAttack.OnAttackFinished -= HandleMeleeAttackFinished;
         }
 
-        private void Update() => UpdateState();
+        private void Update()
+        {
+            if (_flipCooldownTimer > 0f)
+                _flipCooldownTimer -= Time.deltaTime;
+            UpdateState();
+        }
         private void FixedUpdate() => UpdateMovement();
 
         // ══════════════════════════════════════════════════════
@@ -256,6 +269,14 @@ namespace KEY
                     {
                         ChangeState(AIState.Patrol);
                         return;
+                    }
+
+                    // Dash 봉인 중 → 차징 시도 스킵, 플레이어 방향만 유지
+                    // (OnEnterAttack 에서 Chase 복귀 → 매 프레임 무한 반복 방지)
+                    if (IsSealed(SealType.Dash))
+                    {
+                        UpdateChaseDirection();
+                        break;
                     }
 
                     // 차징 발동 범위 + 쿨타임 완료 → Attack
@@ -346,12 +367,21 @@ namespace KEY
                 return;
             }
 
-            // Dash 봉인 → 차징 불가 → Chase 복귀
-            // 기사형의 차징 돌진은 Dash 봉인으로 차단.
-            // OnEnterAttack 진입 시점에 체크해야 봉인 적용 직후 차징 실행 방지.
+            // Dash 봉인 활성 → 차징 불가 → 근접 공격 시도
             if (IsSealed(SealType.Dash))
             {
-                Debug.Log("[EnemyAI] Dash 봉인 활성 → 차징 차단 → Chase 복귀");
+                // 근접 사정거리 안 + 쿨타임 완료 → 근접 1타
+                if (_meleeAttack != null
+                    && _meleeAttack.CanAttack
+                    && _sensor.CheckMeleeRange())
+                {
+                    _meleeAttack.TryAttack(_meleeAttack.MeleeCooldown);
+                    Debug.Log("[EnemyAI] Dash 봉인 → 근접 1타 실행");
+                    return;
+                }
+
+                // 사정거리 밖 or 쿨타임 중 → Chase 유지 (플레이어 추격)
+                Debug.Log("[EnemyAI] Dash 봉인 → 근접 범위 밖, Chase 유지");
                 ChangeState(AIState.Chase);
                 return;
             }
@@ -374,11 +404,20 @@ namespace KEY
 
         /// <summary>
         /// 차징 정상 완료 (목표 거리 도달) → Groggy 진입.
-        /// 벽 충돌 / 봉인 취소 시에는 EnemyKnightChargeAttack 이 직접 EnterGroggy() 호출.
         /// </summary>
         private void HandleChargeAttackFinished()
         {
             EnterGroggy();
+        }
+
+        /// <summary>
+        /// 근접 1타 완료 → 짧은 Groggy → Chase 복귀.
+        /// 차징보다 훨씬 짧은 경직. 플레이어 추격 재개.
+        /// </summary>
+        private void HandleMeleeAttackFinished()
+        {
+            float shortGroggy = _settings != null ? _settings.groggyDuration * 0.25f : 0.5f;
+            EnterGroggy(shortGroggy);
         }
 
         // ══════════════════════════════════════════════════════
@@ -474,6 +513,11 @@ namespace KEY
             float dir = player.position.x > transform.position.x ? 1f : -1f;
             if (Mathf.Approximately(dir, _facingDirection)) return;
 
+            // 방향 전환 쿨타임 체크
+            // 쿨타임 중이면 방향 전환 안 함 → 플레이어가 등 뒤 공략 시간 확보
+            if (_flipCooldownTimer > 0f) return;
+
+            _flipCooldownTimer = _settings != null ? _settings.flipCooldown : 2.0f;
             SetFacing(dir);
         }
 
