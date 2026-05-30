@@ -154,6 +154,7 @@ GameObject:
   - component: {fileID: 1363594226704711952}
   - component: {fileID: 8034309942722479110}
   - component: {fileID: 1403238649912887931}
+  - component: {fileID: 2986606413173616875}
   - component: {fileID: 5275010070133413985}
   - component: {fileID: 483135667179056588}
   m_Layer: 15
@@ -368,6 +369,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.SealComponent
   _overlayRenderer: {fileID: 7762490750886196820}
+--- !u!114 &2986606413173616875
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2426919192178955622}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98553dfdde6dfe944ba7fe52cbefed2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemyKnightAttack
 --- !u!114 &5275010070133413985
 MonoBehaviour:
   m_ObjectHideFlags: 0
