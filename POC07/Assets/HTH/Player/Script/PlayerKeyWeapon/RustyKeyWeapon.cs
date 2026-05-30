@@ -272,7 +272,6 @@ namespace KEY
             float comboWindowRatio = _keyData.comboWindowStartRatio;
             float hitboxStartRatio = _keyData.hitboxStartRatio;
             float hitboxEndRatio = _keyData.hitboxEndRatio;
-            bool hitboxOn = false;
             bool windowReached = false;
 
             // ② 매 프레임 Animator normalizedTime 폴링

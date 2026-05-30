@@ -146,6 +146,9 @@ namespace KEY
         /// </summary>
         private static readonly int _hashAirAttack = Animator.StringToHash("AirAttack");
 
+        private static readonly int _hashAirAttackDown = Animator.StringToHash("AirAttackDown");
+        private static readonly int _hashAirAttackUp = Animator.StringToHash("AirAttackUp");
+
         /// <summary>
         /// 공격 관련 Trigger 해시 배열.
         /// ResetAllAttackTriggers() 에서 일괄 ResetTrigger 에 사용.
@@ -156,6 +159,8 @@ namespace KEY
             Animator.StringToHash("AttackCombo2"),
             Animator.StringToHash("AttackCombo3"),
             Animator.StringToHash("AirAttack"),
+            Animator.StringToHash("AirAttackDown"),
+            Animator.StringToHash("AirAttackUp"),
         };
 
         // ──────────────────────────────────────────
@@ -277,6 +282,18 @@ namespace KEY
             _animator.SetTrigger(_hashAirAttack);
         }
 
+        private void HandleAirAttackDown()
+        {
+            ResetAttackTriggersExcept(_hashAirAttackDown);
+            _animator.SetTrigger(_hashAirAttackDown);
+        }
+
+        private void HandleAirAttackUp()
+        {
+            ResetAttackTriggersExcept(_hashAirAttackUp);
+            _animator.SetTrigger(_hashAirAttackUp);
+        }
+
         /// <summary>
         /// 콤보 리셋 수신.
         /// 모든 공격 Trigger 를 일괄 클리어.
@@ -340,27 +357,42 @@ namespace KEY
             SubscribeWeapon(_currentWeapon);
         }
 
+        private System.Action<int, DamageInfo>_maCombo1, _maCombo2, _maCombo3, _maAirAttack, _maAirSide, _maAirDown, _maAirUp;
+
         private void SubscribeWeapon(PlayerWeaponBase weapon)
         {
             if (weapon is RustyKeyWeapon rusty)
             {
-                rusty.OnCombo1Started += HandleCombo1;
-                rusty.OnCombo2Started += HandleCombo2;
-                rusty.OnCombo3Started += HandleCombo3;
-                rusty.OnAirAttackStarted += HandleAirAttack;
+                // 인자 무시 래퍼 — Animator Trigger 만 발행
+                _maCombo1 = (_, __) => HandleCombo1();
+                _maCombo2 = (_, __) => HandleCombo2();
+                _maCombo3 = (_, __) => HandleCombo3();
+                _maAirAttack = (_, __) => HandleAirAttack();
+                _maAirSide = (_, __) => HandleAirAttack();
+                _maAirDown = (_, __) => HandleAirAttackDown();
+                _maAirUp = (_, __) => HandleAirAttackUp();
+
+                rusty.OnCombo1Started += _maCombo1;
+                rusty.OnCombo2Started += _maCombo2;
+                rusty.OnCombo3Started += _maCombo3;
+                rusty.OnAirAttackStarted += _maAirAttack;
+                rusty.OnAirAttackSide += _maAirSide;
+                rusty.OnAirAttackDown += _maAirDown;
+                rusty.OnAirAttackUp += _maAirUp;
                 rusty.OnComboReset += HandleComboReset;
             }
-            // 추후 HookKeyWeapon 등 추가 시 else if 로 확장
         }
-
         private void UnsubscribeWeapon(PlayerWeaponBase weapon)
         {
             if (weapon is RustyKeyWeapon rusty)
             {
-                rusty.OnCombo1Started -= HandleCombo1;
-                rusty.OnCombo2Started -= HandleCombo2;
-                rusty.OnCombo3Started -= HandleCombo3;
-                rusty.OnAirAttackStarted -= HandleAirAttack;
+                rusty.OnCombo1Started -= _maCombo1;
+                rusty.OnCombo2Started -= _maCombo2;
+                rusty.OnCombo3Started -= _maCombo3;
+                rusty.OnAirAttackStarted -= _maAirAttack;
+                rusty.OnAirAttackSide -= _maAirSide;
+                rusty.OnAirAttackDown -= _maAirDown;
+                rusty.OnAirAttackUp -= _maAirUp;
                 rusty.OnComboReset -= HandleComboReset;
             }
         }
