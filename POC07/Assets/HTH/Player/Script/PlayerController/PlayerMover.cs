@@ -384,6 +384,17 @@ namespace KEY
             OnFlipped?.Invoke(_facingDirection);
         }
 
+        /// <summary>
+        /// 이동 입력을 즉시 0으로 초기화.
+        /// PlayerChargeAttack 이 차징 시작 시 호출.
+        /// </summary>
+        public void StopMovement()
+        {
+            _moveInput = 0f;
+            if (_rigid2D != null)
+                _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
+        }
+
         private void TickTimers()
         {
             if (_coyoteTimer > 0f) _coyoteTimer -= Time.deltaTime;

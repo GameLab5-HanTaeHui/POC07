@@ -248,6 +248,8 @@ namespace KEY
             if (_rigid2D != null)
                 _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
 
+            _playerMover?.StopMovement();
+
             // 조준선 표시
             _aimLine?.Show(GetFireDirection(data));
 
