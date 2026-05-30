@@ -676,82 +676,101 @@ Player (루트)                       Layer: Player (8)
 
 ---
 
-### v0.23 — VFX / 피격 피드백 시스템 (DOTween + 파티클)
+### v0.24 — 플레이어 공격 DOTween 역동성 재설계
 
-**구현 배경**
-기존 피격 피드백이 단순 색상 변경 수준.
-콤보별 임팩트 없이 단순 이동만 하던 무기 스윙에 타격감 추가.
-HitFeedback 을 파티클 연동 구조로 확장하여 모든 피격 상황 시각화.
+**배경**
+v0.23 까지의 무기 스윙은 원점 기준 미세 이동(±0.15~0.6 units) 수준.
+무기를 휘두르는 역동감이 전혀 없는 상태.
+
+**근본 원인 분석**
+```
+Weapon 원점: localPosition = (1, 0, 0)  ← 플레이어 오른손 위치
+Key_0 Pivot: x=0.25 (손잡이 쪽), 열쇠 날이 +X 방향으로 뻗음
+
+기존 코드 문제:
+  1. 절대 좌표 설계가 Weapon 실제 위치(1,0,0) 미반영
+  2. 이동 거리 자체가 너무 작음 (0.15~0.6 units → 깔짝 수준)
+  3. Z회전이 있었으나 이동폭이 작아 체감 불가
+```
+
+**재설계 방향**
+```
+KeyDataSO 에 콤보별 백스윙/타격 위치를 Vector2 로 직접 지정
+모든 좌표 = Player 로컬 기준 절대값 (오른쪽 facing 기준)
+facing = -1 이면 X 좌표만 부호 반전, Y 그대로
+Z회전도 KeyDataSO 에서 직접 지정 (백스윙/타격 각각)
+```
 
 **완성 파일**
 
 | 파일 | 버전 | 역할 |
 |---|---|---|
-| `PlayerWeaponMover.cs` | v1.3 | 콤보별 DOTween 임팩트 + 히트스탑 |
-| `PlayerWeaponAnimator.cs` | v1.2 | 공중 4방향 이벤트 구독 추가 |
-| `HitFeedback.cs` | v2.0 | 파티클 연동 + SealApplied/LockUnlocked 신규 |
-| `HitFeedbackConfig.cs` | v1.0 | 파티클 프리팹 등록 SO (신규) |
-| `HitFeedbackInitializer.cs` | v1.0 | 씬 Config 주입 컴포넌트 (신규) |
-| `SealComponent.cs` | v1.3 | StartSealVisual() HitFeedback.SealApplied() 연동 |
-| `IDamageable.cs` | — | AttackType enum AirAttackDown / AirAttackUp 추가 |
+| `KeyDataSO.cs` | v1.6 | 콤보별 Vector2 위치 + Z회전 필드로 재설계 |
+| `PlayerWeaponMover.cs` | v1.5 | FlipX() 유틸리티 + Sequence 재설계 |
+| `CameraShake.cs` | v1.0 | 카메라 흔들림 유틸리티 (신규) |
+| `MovementAnimator.cs` | v2.2 | AirAttackDown/Up 이벤트 구독 추가 |
+| `RustyKeyWeapon.cs` | v1.6 | 이벤트 Action<int, DamageInfo> 로 변경 |
+| `PlayerWeaponAnimator.cs` | v1.3 | 람다 필드 구독/해제 구조로 변경 |
 
-**신규 파티클 프리팹 5종**
+**KeyDataSO v1.6 — 스윙 섹션 재설계**
 
-| 프리팹 | 색상 | 용도 |
-|---|---|---|
-| `HitEnemyParticle` | 흰+노랑 | 적/플레이어 피격 스파크 |
-| `HitLockParticle` | 파랑+흰 | 자물쇠 피격 마찰 |
-| `UnLockParticle` | 금색 | 자물쇠 해제 폭발 ★ 핵심 |
-| `BlockedShield` | 파랑 | 방패 막힘 |
-| `SealApplied` | 파랑+보라 | 봉인 적용 링 |
+기존 필드 (제거됨):
+```
+backswingDistance, combo1AttackDistance, combo1RotationZ
+combo2AttackDistanceY, combo2RotationZ, combo3AttackDistance, airAttackRotationZ
+```
 
-**PlayerWeaponMover v1.3 — 콤보별 DOTween 임팩트**
-
-| 콤보 | DOTween 효과 |
+신규 필드 (Vector2 절대좌표 + 회전 직접 지정):
+| 필드 | 설명 |
 |---|---|
-| Combo1 | DOPunchPosition(X) + DOPunchRotation(Z) |
-| Combo2 | DOPunchPosition(Y하) + DOPunchScale |
-| Combo3 | 히트스탑(0.06초) + DOPunchPosition(X강) + DOPunchScale |
-| AirSide | DOPunchPosition(X) + DOPunchRotation(Z소) |
-| AirDown | DOPunchPosition(Y강하) + DOPunchScale |
-| AirUp | DOPunchPosition(Y상) + DOPunchRotation(Z역) |
+| `backswingDuration` | 백스윙 이동 시간 |
+| `attackDuration` | 타격 이동 시간 |
+| `combo1BackPos / combo1AttackPos` | Combo1 백스윙/타격 위치 |
+| `combo1RotBack / combo1RotAtk` | Combo1 Z회전 |
+| `combo2BackPos / combo2AttackPos` | Combo2 백스윙/타격 위치 |
+| `combo2RotBack / combo2RotAtk` | Combo2 Z회전 |
+| `combo3BackPos / combo3AttackPos` | Combo3 백스윙/타격 위치 |
+| `airSide/Down/Up BackPos/AttackPos/RotBack/RotAtk` | 공중 공격 위치/회전 |
 
-**히트스탑 구현**
-```
-Combo3 전용. Time.timeScale = 0 → 0.06초 대기 → Time.timeScale = 1
-WaitForSecondsRealtime 사용 (언스케일드 타임)
-Inspector: _hitStopDuration = 0.06f (0 = 비활성)
-```
+**PlayerWeaponMover v1.5 — 핵심 변경**
 
-**HitFeedback v2.0 — 6가지 피드백**
+```csharp
+// facing 방향 X 반전 유틸리티
+private static Vector3 FlipX(Vector2 pos, float facing)
+    => new Vector3(pos.x * facing, pos.y, 0f);
 
-| 메서드 | 파티클 | DOTween |
-|---|---|---|
-| `EnemyHitPlayer` | HitEnemyParticle | 빨간 플래시 + PunchPosition + PunchScale |
-| `PlayerHitLock` | HitLockParticle (progress 비례) | 노랑/빨강 플래시 + PunchScale |
-| `LockUnlocked` ★ | UnLockParticle (금색 폭발) | 금색 플래시 + 큰 PunchScale |
-| `PlayerHitEnemy` | HitEnemyParticle | 흰→빨 플래시 + PunchPosition + PunchScale |
-| `PlayerAttackBlocked` | BlockedShield | 파랑 플래시 + ShakePosition + 무기 반발 |
-| `SealApplied` ★ | SealApplied (링) | 파랑 플래시 + ShakeScale |
-
-**씬 배치**
-```
-GameManager 오브젝트
-  └── [HitFeedbackInitializer]
-        _config = HitFeedbackConfig.asset
+// 모든 Sequence 에서 절대 좌표 사용
+Vector3 backPos   = FlipX(_keyData.combo2BackPos,   f);  // (1.0, 1.2) → 머리 위
+Vector3 attackPos = FlipX(_keyData.combo2AttackPos, f);  // (1.0, -1.0) → 발 아래
 ```
 
-**HitFeedbackConfig.asset 경로**
+**콤보별 기본 궤적**
+
+| 콤보 | 백스윙 위치 | 타격 위치 | Z회전 범위 | 이동 거리 |
+|---|---|---|---|---|
+| Combo1 횡베기 | (0.5, 0.3) | (2.0, -0.3) | +40° → -50° | X 1.5 units |
+| Combo2 내리찍기 | (1.0, 1.5) | (0.8, -1.2) | -90° → +90° | Y 2.7 units |
+| Combo3 찌르기 | (0.3, 0.0) | (2.5, 0.0) | 0° | X 2.2 units |
+| AirDown | (1.0, 1.8) | (0.8, -1.5) | -90° → +90° | Y 3.3 units |
+| AirUp | (1.0, -1.2) | (0.6, 1.8) | +90° → -90° | Y 3.0 units |
+
+**Z회전 규칙 (2D 사이드뷰)**
 ```
-Assets/KEY/DataSO/HitFeedbackConfig.asset
-  fxHitEnemy     = HitEnemyParticle.prefab
-  fxHitLock      = HitLockParticle.prefab
-  fxUnlockLock   = UnLockParticle.prefab
-  fxBlockedShield = BlockedShield.prefab
-  fxSealApplied  = SealApplied.prefab
+0°   = 열쇠 날이 오른쪽 수평 (기본 자세)
++90° = 열쇠 날이 위를 향함
+-90° = 열쇠 날이 아래를 향함
+facing = -1 이면 부호 반전 (대칭)
 ```
 
-**파일 버전 스냅샷 (v0.23 기준)**
+**CameraShake v1.0**
+```
+static bool IsEnabled   Inspector on/off (CameraShakeSettings 컴포넌트)
+Preset.Light/Medium/Heavy  강도별 프리셋
+Combo3 → Heavy / AirDown → Medium
+Z축 강도 = 0 강제 (2D 사이드뷰 전후 이동 방지)
+```
+
+**파일 버전 스냅샷 (v0.24 기준)**
 
 | 파일 | 버전 |
 |---|---|
@@ -760,12 +779,14 @@ Assets/KEY/DataSO/HitFeedbackConfig.asset
 | `PlayerChargeAttack.cs` | v1.4 |
 | `PlayerHealth.cs` | v1.0 |
 | `ObjectFlipController.cs` | v1.2 |
-| `PlayerWeaponMover.cs` | v1.3 |
-| `PlayerWeaponAnimator.cs` | v1.2 |
+| `PlayerWeaponMover.cs` | v1.5 |
+| `PlayerWeaponAnimator.cs` | v1.3 |
 | `PlayerWeaponController.cs` | v1.5 |
 | `PlayerWeaponHitboxManager.cs` | v1.3 |
-| `RustyKeyWeapon.cs` | v1.5 |
-| `KeyDataSO.cs` | v1.4 |
+| `RustyKeyWeapon.cs` | v1.6 |
+| `MovementAnimator.cs` | v2.2 |
+| `KeyDataSO.cs` | v1.6 |
+| `CameraShake.cs` | v1.0 |
 | `SealProjectile.cs` | v2.0 |
 | `SealComponent.cs` | v1.3 |
 | `HitFeedback.cs` | v2.0 |

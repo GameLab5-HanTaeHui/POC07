@@ -9240,6 +9240,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 7912308602437152547, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: m_Size.x
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 7912308602437152547, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: m_Size.y
+      value: 1.3
+      objectReference: {fileID: 0}
     - target: {fileID: 8859498424932560432, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

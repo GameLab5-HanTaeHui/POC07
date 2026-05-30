@@ -135,6 +135,7 @@ namespace KEY
         private EnemyAI _enemyAI;
         private Rigidbody2D _rigid2D;
         private SpriteRenderer _spriteRenderer;
+        private SealComponent _sealComponent;
 
         // ──────────────────────────────────────────
         // 버퍼
@@ -152,6 +153,7 @@ namespace KEY
             _enemyAI = GetComponent<EnemyAI>();
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
+            _sealComponent = GetComponent<SealComponent>();
 
             if (_lineRenderer != null)
             {
@@ -202,6 +204,17 @@ namespace KEY
 
             while (elapsed < _countdownDuration)
             {
+                if (_sealComponent != null && _sealComponent.IsSealedAction(SealType.Dash))
+                {
+                    if (_lineRenderer != null) _lineRenderer.enabled = false;
+                    if (_countdownText != null) _countdownText.enabled = false;
+                    if (_spriteRenderer != null) _spriteRenderer.color = Color.white;
+                    _confirmedLength = 0f;
+                    _enemyAI?.EnterGroggy();
+                    Debug.Log("[KnightCharge] 카운트다운 중 Dash 봉인 → 취소, Groggy 진입");
+                    yield break;
+                }
+
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / _countdownDuration);
 
