@@ -346,6 +346,16 @@ namespace KEY
                 return;
             }
 
+            // Dash 봉인 → 차징 불가 → Chase 복귀
+            // 기사형의 차징 돌진은 Dash 봉인으로 차단.
+            // OnEnterAttack 진입 시점에 체크해야 봉인 적용 직후 차징 실행 방지.
+            if (IsSealed(SealType.Dash))
+            {
+                Debug.Log("[EnemyAI] Dash 봉인 활성 → 차징 차단 → Chase 복귀");
+                ChangeState(AIState.Chase);
+                return;
+            }
+
             // 차징 공격 실행
             if (_chargeAttack != null && _chargeAttack.CanAttack)
             {
