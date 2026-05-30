@@ -1,31 +1,50 @@
 ﻿// ============================================================
-// PlayerWeaponMover.cs  v1.3
+// PlayerWeaponMover.cs  v1.4
 // Weapon 오브젝트 스윙 이동 전담 컴포넌트
 //
-// [v1.3 변경 — 콤보별 DOTween 임팩트 차별화]
+// [v1.4 변경 — DOTween Sequence 3단계 스윙 + Z축 회전]
 //
-//   ① 콤보 단계별 스윙 임팩트 추가
-//       Combo1 : DOPunchPosition X(수평) + DOPunchRotation Z
-//       Combo2 : DOPunchPosition Y(하향) + DOShakeScale
-//       Combo3 : 선딜레이 0.06초 + DOPunchPosition X(강) + 히트스탑
-//       AirSide: DOPunchPosition X + DOPunchRotation Z(소)
-//       AirDown: DOPunchPosition Y(강하향) + DOShakeScale
-//       AirUp  : DOPunchPosition Y(상향) + DOPunchRotation Z
+//   기존: 단순 DOLocalMove(원점→타격→원점) + DOPunch 임팩트
+//   변경: 백스윙(준비) → 타격 → 복귀 3단계 시퀀스
 //
-//   ② 히트스탑 구현
-//       Combo3 히트박스 활성 직전 0.06초 동안 Time.timeScale = 0 처리.
-//       DOTween.To 로 timeScale 제어. SetUpdate(true) 로 언스케일드 타임 사용.
+//   [Combo1 — 가로 횡베기]
+//     백스윙: 후방으로 당김 + Z 역회전
+//     타격:   전방 X 전진 + Z 하향 회전 (칼날 아래로)
+//     복귀:   원점 + Z 0°
 //
-//   ③ AttackType 확장
-//       AirSide / AirDown / AirUp 분기 추가.
-//       RustyKeyWeapon v1.5 의 4방향 이벤트와 연동.
+//   [Combo2 — 내리찍기]
+//     백스윙: 위로 들어올림 + Z 역회전
+//     타격:   Y 하향 내리침 + Z 전방 회전
+//     복귀:   원점 (OutBounce — 찍힌 느낌)
+//
+//   [Combo3 — 찌르기 피니셔]
+//     히트스탑 0.06초
+//     백스윙: 후방으로 크게 당김
+//     타격:   X 강한 전진 (InExpo) + PunchScale
+//     복귀:   원점 (OutExpo)
+//
+//   [AirSide — 공중 수평 횡베기]
+//     Combo1 과 유사 + 약간 하향 궤적
+//
+//   [AirDown — 공중 내리찍기]
+//     백스윙: 위로 크게 들어올림 + 큰 Z 역회전
+//     타격:   Y 강하향 + 큰 Z 회전 아크
+//     복귀:   원점
+//     카메라 흔들림 Medium
+//
+//   [AirUp — 공중 상향 퍼올리기]
+//     백스윙: 아래로 낮춤 + Z 하향 기울기
+//     타격:   Y 상향 퍼올림 + Z 역방향 회전
+//     복귀:   원점
+//
+//   DOTween Sequence.Join() 으로 이동+회전 동시 제어.
+//   회전은 모두 localRotation Z축만 사용 (2D 사이드뷰).
+//
+// [v1.3 변경]
+//   콤보별 DOPunch 임팩트 + 히트스탑.
 //
 // [v1.2 변경]
-//   SyncOrigin(dir) 추가 — ObjectFlipController 에서 호출.
-//   왼쪽 공격 방향 튀는 버그 수정.
-//
-// [v1.1 변경]
-//   PlayerMover.OnFlipped 구독 추가.
+//   SyncOrigin(dir) 추가.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -38,20 +57,22 @@ using DG.Tweening;
 namespace KEY
 {
     /// <summary>
-    /// Weapon 오브젝트 스윙 이동 전담 컴포넌트. (v1.3)
+    /// Weapon 오브젝트 스윙 이동 전담 컴포넌트. (v1.4)
     ///
     /// ────────────────────────────────────────────────────
-    /// [콤보별 임팩트]
-    ///   Combo1 : 수평 스윙 — PunchPosition(X) + PunchRotation(Z)
-    ///   Combo2 : 내리찍기 — PunchPosition(Y하) + ShakeScale
-    ///   Combo3 : 피니셔   — 히트스탑(0.06초) + PunchPosition(X강) + ShakeScale
-    ///   AirSide: 수평 공격 — PunchPosition(X) + PunchRotation(Z소)
-    ///   AirDown: 내리찍기  — PunchPosition(Y강하) + ShakeScale
-    ///   AirUp  : 상향 공격 — PunchPosition(Y상) + PunchRotation(Z역)
+    /// [3단계 시퀀스]
+    ///   ① 백스윙 (반대 방향으로 당김 / 0.05~0.07초)
+    ///   ② 타격   (큰 이동 + Z축 회전 / 0.08~0.12초)
+    ///   ③ 복귀   (원점 + Z=0° / 0.12~0.18초)
     ///
-    /// [히트스탑]
-    ///   Combo3 전용. Time.timeScale 을 0.05초 동안 0 으로 설정 후 복원.
-    ///   DOTween SetUpdate(true) 로 언스케일드 타임에서 동작.
+    /// [2D 사이드뷰]
+    ///   회전 = Z축만 사용. X/Y 이동으로 방향 표현.
+    ///   Z+ 회전 = 칼날 왼쪽 기울기 / Z- = 오른쪽 기울기.
+    ///   facing 방향에 따라 부호 자동 반전.
+    ///
+    /// [CameraShake]
+    ///   Combo3, AirDown 타격 시 CameraShake 호출.
+    ///   CameraShake.IsEnabled = false 이면 무시.
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class PlayerWeaponMover : MonoBehaviour
@@ -74,16 +95,13 @@ namespace KEY
         // 내부 참조
         // ──────────────────────────────────────────
 
-        /// <summary> 현재 장착된 열쇠 데이터. </summary>
         private KeyDataSO _keyData;
-
-        private Tween _swingTween;
+        private Sequence _swingSequence;
         private Coroutine _swingCoroutine;
 
         /// <summary>
-        /// Weapon 오브젝트의 로컬 원점 위치.
-        /// Awake 에서 초기값 캐싱.
-        /// SyncOrigin / OnFlipped 수신 시 X 부호가 반전됨.
+        /// Weapon 로컬 원점 위치.
+        /// Awake 캐싱. SyncOrigin 으로 갱신.
         /// </summary>
         private Vector3 _originLocalPosition;
 
@@ -91,7 +109,6 @@ namespace KEY
         // 프로퍼티
         // ──────────────────────────────────────────
 
-        /// <summary> 현재 스윙 중 여부. </summary>
         public bool IsSwinging { get; private set; }
 
         // ══════════════════════════════════════════════════════
@@ -105,8 +122,7 @@ namespace KEY
 
         private void OnDestroy()
         {
-            _swingTween?.Kill();
-            // 히트스탑 중 파괴 시 TimeScale 복원
+            _swingSequence?.Kill();
             if (Mathf.Approximately(Time.timeScale, 0f))
                 Time.timeScale = 1f;
         }
@@ -115,14 +131,11 @@ namespace KEY
         // 외부 API
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 열쇠 데이터 주입.
-        /// PlayerWeaponController.ActivateWeapon() 에서 호출.
-        /// </summary>
+        /// <summary> 열쇠 데이터 주입. </summary>
         public void SetKeyData(KeyDataSO keyData) => _keyData = keyData;
 
         /// <summary>
-        /// 방향 전환 시 _originLocalPosition.x 동기화.
+        /// 방향 전환 시 원점 X 동기화.
         /// ObjectFlipController.OnFlipped() 에서 호출.
         /// </summary>
         public void SyncOrigin(float dir)
@@ -133,228 +146,304 @@ namespace KEY
                 _originLocalPosition.z);
 
             if (!IsSwinging)
+            {
                 transform.localPosition = _originLocalPosition;
+                transform.localRotation = Quaternion.identity;
+            }
         }
 
         /// <summary>
-        /// 스윙 이동 실행.
+        /// 스윙 실행.
         /// PlayerWeaponAnimator 에서 콤보 이벤트 수신 시 호출.
         /// </summary>
         public void PlaySwing(AttackType attackType)
         {
             if (_keyData == null) return;
 
-            _swingTween?.Kill();
+            _swingSequence?.Kill();
             if (_swingCoroutine != null) StopCoroutine(_swingCoroutine);
 
             transform.localPosition = _originLocalPosition;
+            transform.localRotation = Quaternion.identity;
+
             _swingCoroutine = StartCoroutine(SwingRoutine(attackType));
         }
 
         /// <summary>
-        /// 진행 중인 스윙 즉시 중단 + 원점 복귀.
-        /// 콤보 리셋 / 무기 교체 / 방향 전환 시 호출.
+        /// 스윙 즉시 중단 + 원점 복귀.
         /// </summary>
         public void CancelSwing()
         {
-            _swingTween?.Kill();
+            _swingSequence?.Kill();
             if (_swingCoroutine != null) StopCoroutine(_swingCoroutine);
 
             IsSwinging = false;
             transform.localPosition = _originLocalPosition;
+            transform.localRotation = Quaternion.identity;
         }
 
         // ══════════════════════════════════════════════════════
         // 스윙 코루틴
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 스윙 시퀀스 코루틴.
-        ///
-        /// [흐름]
-        ///   1. (Combo3만) 히트스탑 0.06초
-        ///   2. 앞으로 뻗기 + DOTween 임팩트 (swingDuration)
-        ///   3. 히트박스 유지 (hitboxDuration - swingDuration)
-        ///   4. 원점 복귀 (returnDuration)
-        /// </summary>
         private IEnumerator SwingRoutine(AttackType attackType)
         {
             IsSwinging = true;
 
             float facing = PlayerMovementFacade.Instance?.FacingDirection ?? 1f;
 
-            // ── ① Combo3 히트스탑 ──────────────────────────────
+            // ① Combo3 히트스탑
             if (attackType == AttackType.Combo3 && _hitStopDuration > 0f)
                 yield return StartCoroutine(HitStopRoutine(_hitStopDuration));
 
-            // ── ② 앞으로 뻗기 + 임팩트 DOTween ──────────────────
-            Vector3 targetPos = _originLocalPosition + GetSwingOffset(attackType, facing);
+            // ② 3단계 Sequence 실행
+            bool done = false;
+            _swingSequence = BuildSwingSequence(attackType, facing);
+            _swingSequence.OnComplete(() => done = true);
+            _swingSequence.Play();
 
-            bool swingDone = false;
-            _swingTween = transform.DOLocalMove(targetPos, _keyData.swingDuration)
-                .SetEase(Ease.OutQuart)
-                .OnComplete(() => swingDone = true);
-
-            // 임팩트 DOTween (이동과 동시)
-            ApplySwingImpact(attackType, facing);
-
-            yield return new WaitUntil(() => swingDone);
-
-            // ── ③ 히트박스 유지 구간 ──────────────────────────────
-            float holdTime = Mathf.Max(0f, _keyData.hitboxDuration - _keyData.swingDuration);
-            if (holdTime > 0f)
-                yield return new WaitForSeconds(holdTime);
-
-            // ── ④ 원점 복귀 ──────────────────────────────────────
-            bool returnDone = false;
-            _swingTween = transform.DOLocalMove(_originLocalPosition, _keyData.returnDuration)
-                .SetEase(Ease.InQuart)
-                .OnComplete(() => returnDone = true);
-
-            yield return new WaitUntil(() => returnDone);
+            yield return new WaitUntil(() => done);
 
             IsSwinging = false;
         }
 
         // ══════════════════════════════════════════════════════
-        // 임팩트 DOTween (v1.3 신규)
+        // Sequence 빌더 — 공격 타입별 3단계
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 공격 타입별 DOTween 임팩트 적용.
-        /// PlaySwing 이동과 동시에 실행.
+        /// 공격 타입별 DOTween Sequence 생성.
         ///
-        /// [Combo1] 수평 스윙 — PunchPosition(X) + PunchRotation(Z)
-        /// [Combo2] 내리찍기 — PunchPosition(Y하) + ShakeScale
-        /// [Combo3] 피니셔   — PunchPosition(X강) + ShakeScale
-        /// [AirSide] 수평    — PunchPosition(X) + PunchRotation(Z소)
-        /// [AirDown] 내리찍기 — PunchPosition(Y강하) + ShakeScale
-        /// [AirUp]  상향     — PunchPosition(Y상) + PunchRotation(Z역)
+        /// [공통 구조]
+        ///   Append: 백스윙 이동 + Join: Z 역회전
+        ///   Append: 타격 이동   + Join: Z 타격 회전
+        ///   Append: 복귀        + Join: Z 복귀
+        ///   (Combo3) Append: PunchScale (착탄 임팩트)
+        ///
+        /// [2D 사이드뷰 회전 규칙]
+        ///   Z+ = 반시계 = 칼날 왼쪽 기울기
+        ///   Z- = 시계   = 칼날 오른쪽 기울기
+        ///   facing × rotZ 로 방향에 맞게 자동 부호 적용
         /// </summary>
-        private void ApplySwingImpact(AttackType attackType, float facing)
+        private Sequence BuildSwingSequence(AttackType attackType, float facing)
         {
-            DOTween.Kill(transform, false); // 기존 임팩트 Kill (이동 Tween 제외)
+            Sequence seq = DOTween.Sequence();
+
+            // 수치 단축 참조
+            float bsDist = _keyData.backswingDistance;
+            float bsDur = _keyData.backswingDuration;
+            float retDur = _keyData.returnDuration;
+            float atk1 = _keyData.combo1AttackDistance;
+            float rot1 = _keyData.combo1RotationZ;
+            float atk2Y = _keyData.combo2AttackDistanceY;
+            float rot2 = _keyData.combo2RotationZ;
+            float atk3 = _keyData.combo3AttackDistance;
+            float airRot = _keyData.airAttackRotationZ;
+            float swDur = _keyData.swingDuration;
+
+            Vector3 origin = _originLocalPosition;
 
             switch (attackType)
             {
+                // ── Combo1 — 가로 횡베기 ──────────────────────────
                 case AttackType.Combo1:
-                    // 수평 스윙 — 전방 펀치 + 약한 회전
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.18f, 0f, 0f),
-                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
-                    transform.DOPunchRotation(
-                        new Vector3(0f, 0f, facing * -8f),
-                        duration: 0.15f, vibrato: 2, elasticity: 0.4f);
-                    break;
+                    {
+                        Vector3 bsPos = origin + new Vector3(-facing * bsDist, 0.05f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * atk1, -0.1f, 0f);
 
+                        // 백스윙 — 뒤로 당기며 Z 역회전 (칼날 위로)
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, facing * rot1 * 0.5f), bsDur)
+                            .SetEase(Ease.OutQuart));
+
+                        // 타격 — 전방 하향으로 크게 스윙 + Z 하향 회전 (칼날 아래)
+                        seq.Append(transform.DOLocalMove(atkPos, swDur)
+                            .SetEase(Ease.InOutCubic));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, -facing * rot1), swDur)
+                            .SetEase(Ease.InOutCubic));
+
+                        // 히트박스 유지
+                        float hold1 = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (hold1 > 0f) seq.AppendInterval(hold1);
+
+                        // 복귀
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(Vector3.zero, retDur)
+                            .SetEase(Ease.OutQuart));
+                        break;
+                    }
+
+                // ── Combo2 — 내리찍기 ──────────────────────────────
                 case AttackType.Combo2:
-                    // 내리찍기 — 하향 펀치 + 스케일 흔들림
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.1f, -0.2f, 0f),
-                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
-                    transform.DOPunchScale(
-                        new Vector3(0.15f, -0.1f, 0f),
-                        duration: 0.14f, vibrato: 3, elasticity: 0.4f);
-                    break;
+                    {
+                        Vector3 bsPos = origin + new Vector3(facing * 0.05f, 0.35f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * 0.15f, -atk2Y, 0f);
 
+                        // 백스윙 — 위로 들어올림 + Z 역회전
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, -facing * rot2 * 0.6f), bsDur)
+                            .SetEase(Ease.OutQuart));
+
+                        // 타격 — 하향 내리침 + Z 전방 회전
+                        seq.Append(transform.DOLocalMove(atkPos, swDur)
+                            .SetEase(Ease.InCubic));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, facing * rot2), swDur)
+                            .SetEase(Ease.InCubic));
+
+                        float hold2 = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (hold2 > 0f) seq.AppendInterval(hold2);
+
+                        // 복귀 — OutBounce (찍힌 느낌)
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutBounce));
+                        seq.Join(transform.DOLocalRotate(Vector3.zero, retDur)
+                            .SetEase(Ease.OutQuart));
+                        break;
+                    }
+
+                // ── Combo3 — 찌르기 피니셔 ────────────────────────
                 case AttackType.Combo3:
-                    // 피니셔 — 강한 전방 펀치 + 스케일 흔들림
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.28f, 0f, 0f),
-                        duration: 0.15f, vibrato: 3, elasticity: 0.2f);
-                    transform.DOPunchScale(
-                        new Vector3(0.2f, 0.2f, 0f),
-                        duration: 0.18f, vibrato: 4, elasticity: 0.5f);
-                    break;
+                    {
+                        Vector3 bsPos = origin + new Vector3(-facing * bsDist * 1.3f, 0f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * atk3, 0f, 0f);
 
-                case AttackType.AirAttack: // AirSide (기본값)
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.15f, 0f, 0f),
-                        duration: 0.1f, vibrato: 2, elasticity: 0.3f);
-                    transform.DOPunchRotation(
-                        new Vector3(0f, 0f, facing * -5f),
-                        duration: 0.12f, vibrato: 2, elasticity: 0.4f);
-                    break;
+                        // 백스윙 — 뒤로 크게 당김 (회전 없음 — 직선 찌르기)
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
 
-                // ── 공중 4방향 (v0.22 연동) ──────────────────────
+                        // 타격 — 강하게 전방 찌르기 (InExpo — 폭발적 가속)
+                        seq.Append(transform.DOLocalMove(atkPos, swDur * 0.8f)
+                            .SetEase(Ease.InExpo));
+
+                        // 착탄 임팩트 스케일 — 타격과 동시
+                        seq.Join(transform.DOPunchScale(
+                            Vector3.one * 0.3f, 0.12f, vibrato: 5, elasticity: 0.4f));
+
+                        // 카메라 흔들림
+                        seq.InsertCallback(bsDur + swDur * 0.8f,
+                            () => CameraShake.Shake(CameraShake.Preset.Heavy));
+
+                        float hold3 = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (hold3 > 0f) seq.AppendInterval(hold3);
+
+                        // 복귀 — OutExpo
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutExpo));
+                        break;
+                    }
+
+                // ── AirSide — 공중 수평 횡베기 ────────────────────
+                case AttackType.AirAttack:
+                    {
+                        Vector3 bsPos = origin + new Vector3(-facing * bsDist * 0.8f, 0.05f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * atk1 * 0.8f, -0.1f, 0f);
+
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, facing * rot1 * 0.4f), bsDur)
+                            .SetEase(Ease.OutQuart));
+
+                        seq.Append(transform.DOLocalMove(atkPos, swDur * 1.1f)
+                            .SetEase(Ease.InOutCubic));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, -facing * airRot * 0.8f), swDur * 1.1f)
+                            .SetEase(Ease.InOutCubic));
+
+                        float holdAS = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (holdAS > 0f) seq.AppendInterval(holdAS);
+
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(Vector3.zero, retDur)
+                            .SetEase(Ease.OutQuart));
+                        break;
+                    }
+
+                // ── AirDown — 공중 내리찍기 ───────────────────────
                 case AttackType.AirAttackDown:
-                    // 내리찍기 — 강한 하향 + 스케일 진동
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.08f, -0.3f, 0f),
-                        duration: 0.13f, vibrato: 3, elasticity: 0.2f);
-                    transform.DOPunchScale(
-                        new Vector3(0.1f, 0.25f, 0f),
-                        duration: 0.16f, vibrato: 4, elasticity: 0.4f);
-                    break;
+                    {
+                        Vector3 bsPos = origin + new Vector3(facing * 0.05f, 0.4f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * 0.1f, -atk2Y * 1.3f, 0f);
 
+                        // 백스윙 — 위로 크게 들어올림 + 큰 Z 역회전
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, -facing * airRot * 0.8f), bsDur)
+                            .SetEase(Ease.OutQuart));
+
+                        // 타격 — 강하게 Y 하향 + 큰 아크 회전
+                        seq.Append(transform.DOLocalMove(atkPos, swDur)
+                            .SetEase(Ease.InCubic));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, facing * airRot), swDur)
+                            .SetEase(Ease.InCubic));
+
+                        // 카메라 흔들림
+                        seq.InsertCallback(bsDur + swDur,
+                            () => CameraShake.Shake(CameraShake.Preset.Medium));
+
+                        float holdAD = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (holdAD > 0f) seq.AppendInterval(holdAD);
+
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(Vector3.zero, retDur)
+                            .SetEase(Ease.OutQuart));
+                        break;
+                    }
+
+                // ── AirUp — 공중 상향 퍼올리기 ────────────────────
                 case AttackType.AirAttackUp:
-                    // 상향 공격 — 상방 펀치 + 역회전
-                    transform.DOPunchPosition(
-                        new Vector3(facing * 0.08f, 0.25f, 0f),
-                        duration: 0.12f, vibrato: 2, elasticity: 0.3f);
-                    transform.DOPunchRotation(
-                        new Vector3(0f, 0f, facing * 10f),
-                        duration: 0.15f, vibrato: 2, elasticity: 0.4f);
-                    break;
+                    {
+                        Vector3 bsPos = origin + new Vector3(facing * 0.05f, -0.25f, 0f);
+                        Vector3 atkPos = origin + new Vector3(facing * 0.15f, atk2Y * 1.2f, 0f);
+
+                        // 백스윙 — 아래로 낮춤 + Z 하향 기울기
+                        seq.Append(transform.DOLocalMove(bsPos, bsDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, facing * airRot * 0.6f), bsDur)
+                            .SetEase(Ease.OutQuart));
+
+                        // 타격 — Y 상향 퍼올림 + Z 역방향 큰 회전
+                        seq.Append(transform.DOLocalMove(atkPos, swDur * 1.1f)
+                            .SetEase(Ease.InOutCubic));
+                        seq.Join(transform.DOLocalRotate(
+                            new Vector3(0f, 0f, -facing * airRot), swDur * 1.1f)
+                            .SetEase(Ease.InOutCubic));
+
+                        float holdAU = Mathf.Max(0f, _keyData.hitboxDuration - swDur - bsDur);
+                        if (holdAU > 0f) seq.AppendInterval(holdAU);
+
+                        seq.Append(transform.DOLocalMove(origin, retDur)
+                            .SetEase(Ease.OutQuart));
+                        seq.Join(transform.DOLocalRotate(Vector3.zero, retDur)
+                            .SetEase(Ease.OutQuart));
+                        break;
+                    }
             }
+
+            return seq;
         }
 
         // ══════════════════════════════════════════════════════
-        // 히트스탑 코루틴 (v1.3 신규)
+        // 히트스탑
         // ══════════════════════════════════════════════════════
 
-        /// <summary>
-        /// 히트스탑: TimeScale 을 0 으로 설정 → duration 후 복원.
-        /// DOTween.SetUpdate(true) 로 언스케일드 타임 사용.
-        /// Combo3 전용.
-        /// </summary>
         private IEnumerator HitStopRoutine(float duration)
         {
             Time.timeScale = 0f;
-
-            // WaitForSecondsRealtime — TimeScale 0 에서도 동작
             yield return new WaitForSecondsRealtime(duration);
-
             Time.timeScale = 1f;
-        }
-
-        // ══════════════════════════════════════════════════════
-        // 스윙 오프셋 계산
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// AttackType 별 스윙 오프셋 계산.
-        ///
-        /// [지상 콤보]   FacingDirection × swingDistance → X 전진
-        /// [AirSide]     X 전진 + 소량 Y 하향
-        /// [AirDown]     강한 Y 하향 + 소량 X 전진
-        /// [AirUp]       Y 상향 + 소량 X 전진
-        /// </summary>
-        private Vector3 GetSwingOffset(AttackType attackType, float facing)
-        {
-            switch (attackType)
-            {
-                case AttackType.AirAttack:   // AirSide
-                    return new Vector3(
-                        facing * _keyData.swingDistance * 0.5f,
-                        -_keyData.airSwingDistance * 0.4f,
-                        0f);
-
-                case AttackType.AirAttackDown:
-                    return new Vector3(
-                        facing * _keyData.swingDistance * 0.2f,
-                        -_keyData.airSwingDistance,
-                        0f);
-
-                case AttackType.AirAttackUp:
-                    return new Vector3(
-                        facing * _keyData.swingDistance * 0.2f,
-                        _keyData.airSwingDistance,
-                        0f);
-
-                default: // Combo1 / Combo2 / Combo3
-                    return new Vector3(facing * _keyData.swingDistance, 0f, 0f);
-            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -364,12 +453,18 @@ namespace KEY
 #if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(
-                transform.parent != null
-                    ? transform.parent.TransformPoint(_originLocalPosition)
-                    : transform.position,
-                0.08f);
+            if (!Application.isPlaying) return;
+            Gizmos.color = IsSwinging ? Color.red : Color.cyan;
+            Gizmos.DrawWireSphere(transform.position, 0.08f);
+
+            // 원점 표시
+            if (transform.parent != null)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawWireSphere(
+                    transform.parent.TransformPoint(_originLocalPosition),
+                    0.05f);
+            }
         }
 #endif
     }

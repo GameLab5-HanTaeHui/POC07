@@ -112,6 +112,71 @@ namespace KEY
         [SerializeField] public float airAttackMultiplier = 1.3f;
 
         // ──────────────────────────────────────────
+        // 콤보별 스윙 수치
+        // ──────────────────────────────────────────
+
+        [Header("── 콤보별 스윙 수치 ──────────────────────")]
+
+        /// <summary>
+        /// 백스윙 거리 (units).
+        /// 공격 전 무기를 반대 방향으로 당기는 준비 동작 거리.
+        /// </summary>
+        [Tooltip("백스윙 거리 (units). 공격 전 반대 방향으로 당기는 거리. 권장: 0.1~0.25")]
+        [Min(0f)]
+        [SerializeField] public float backswingDistance = 0.15f;
+
+        /// <summary>
+        /// 백스윙 지속 시간 (초).
+        /// </summary>
+        [Tooltip("백스윙 지속 시간 (초). 권장: 0.05~0.08")]
+        [Min(0.01f)]
+        [SerializeField] public float backswingDuration = 0.06f;
+
+        /// <summary>
+        /// Combo1 타격 이동 거리 (units). 가로 횡베기 X 전진.
+        /// </summary>
+        [Tooltip("Combo1 타격 거리 (units). 가로 횡베기 X 전진. 권장: 0.35~0.5")]
+        [Min(0f)]
+        [SerializeField] public float combo1AttackDistance = 0.45f;
+
+        /// <summary>
+        /// Combo1 타격 시 Z축 회전 각도 (도). 칼날 아래로 향하는 횡베기 느낌.
+        /// facing 방향에 따라 부호 자동 적용됨.
+        /// </summary>
+        [Tooltip("Combo1 Z축 회전 (도). 횡베기 칼날 기울기. 권장: 25~40")]
+        [Range(0f, 90f)]
+        [SerializeField] public float combo1RotationZ = 35f;
+
+        /// <summary>
+        /// Combo2 내리찍기 Y 하향 타격 거리 (units).
+        /// </summary>
+        [Tooltip("Combo2 Y 하향 타격 거리 (units). 내리찍기. 권장: 0.3~0.5")]
+        [Min(0f)]
+        [SerializeField] public float combo2AttackDistanceY = 0.4f;
+
+        /// <summary>
+        /// Combo2 타격 시 Z축 회전 각도 (도). 내리찍기 칼날 기울기.
+        /// </summary>
+        [Tooltip("Combo2 Z축 회전 (도). 내리찍기 칼날 기울기. 권장: 20~35")]
+        [Range(0f, 90f)]
+        [SerializeField] public float combo2RotationZ = 25f;
+
+        /// <summary>
+        /// Combo3 찌르기 X 전진 타격 거리 (units). 가장 큰 전진.
+        /// </summary>
+        [Tooltip("Combo3 타격 거리 (units). 찌르기 피니셔 X 전진. 권장: 0.5~0.7")]
+        [Min(0f)]
+        [SerializeField] public float combo3AttackDistance = 0.6f;
+
+        /// <summary>
+        /// 공중 공격 Z축 회전 기본 각도 (도).
+        /// AirSide / AirDown / AirUp 에 각각 부호를 다르게 적용.
+        /// </summary>
+        [Tooltip("공중 공격 Z축 회전 기본 각도 (도). 권장: 40~60")]
+        [Range(0f, 90f)]
+        [SerializeField] public float airAttackRotationZ = 50f;
+
+        // ──────────────────────────────────────────
         // 스윙 이동 수치
         // ──────────────────────────────────────────
 
