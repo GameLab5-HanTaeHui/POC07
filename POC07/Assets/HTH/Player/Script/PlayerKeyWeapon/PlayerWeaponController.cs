@@ -203,6 +203,7 @@ namespace KEY
             weapon.SetKeyData(keyData);
             weapon.enabled = true;
             _currentWeapon = weapon;
+            var hitboxManager = GetComponentInChildren<PlayerWeaponHitboxManager>();
 
             // MovementAnimator — Combo Trigger 이벤트 재구독
             _movementAnimator?.SetWeapon(weapon);
@@ -212,6 +213,9 @@ namespace KEY
 
             // PlayerWeaponMover — 스윙 수치 갱신
             _weaponMover?.SetKeyData(keyData);
+
+            // PlayerAnimator - HitBox 갱신
+            _weaponMover.SetHitboxManager(hitboxManager);
         }
 
         /// <summary>

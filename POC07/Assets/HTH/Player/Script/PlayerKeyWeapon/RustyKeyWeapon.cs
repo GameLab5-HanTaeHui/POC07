@@ -29,6 +29,7 @@
 
 using System.Collections;
 using UnityEngine;
+using static UnityEngine.Rendering.DebugUI;
 
 namespace KEY
 {
@@ -125,26 +126,20 @@ namespace KEY
         // 이벤트
         // ──────────────────────────────────────────
 
-        /// <summary> Combo1 시작 시 발행. MovementAnimator → AttackCombo1 Trigger. </summary>
-        public event System.Action OnCombo1Started;
+        /// <summary>
+        /// 지상 콤보 공격 시작 시 발행.
+        /// PlayerWeaponAnimator → PlaySwing(attackType, hitboxIdx, damageInfo) 호출.
+        /// int: 히트박스 인덱스 / DamageInfo: 피해 정보
+        /// </summary>
+        public event System.Action<int, DamageInfo> OnCombo1Started;
+        public event System.Action<int, DamageInfo> OnCombo2Started;
+        public event System.Action<int, DamageInfo> OnCombo3Started;
 
-        /// <summary> Combo2 시작 시 발행. MovementAnimator → AttackCombo2 Trigger. </summary>
-        public event System.Action OnCombo2Started;
-
-        /// <summary> Combo3 시작 시 발행. MovementAnimator → AttackCombo3 Trigger. </summary>
-        public event System.Action OnCombo3Started;
-
-        /// <summary> 공중 공격 시작 시 발행. MovementAnimator → AirAttack Trigger. </summary>
-        public event System.Action OnAirAttackStarted;
-
-        /// <summary> 공중 수평 공격. MovementAnimator → AirAttack Trigger. </summary>
-        public event System.Action OnAirAttackSide;
-
-        /// <summary> 공중 하향 내리찍기. MovementAnimator → AirAttackDown Trigger. </summary>
-        public event System.Action OnAirAttackDown;
-
-        /// <summary> 공중 상향 공격. MovementAnimator → AirAttackUp Trigger. </summary>
-        public event System.Action OnAirAttackUp;
+        // 공중 공격도 동일하게 변경:
+        public event System.Action<int, DamageInfo> OnAirAttackSide;
+        public event System.Action<int, DamageInfo> OnAirAttackDown;
+        public event System.Action<int, DamageInfo> OnAirAttackUp;
+        public event System.Action<int, DamageInfo> OnAirAttackStarted; // 하위 호환
 
         /// <summary> 콤보 리셋 시 발행. PlayerWeaponAnimator → 스윙 취소. </summary>
         public event System.Action OnComboReset;
@@ -244,7 +239,6 @@ namespace KEY
             _isAttacking = false;
             _lastAttackInputFrame = -1;
 
-            _hitboxManager?.DisableAllHitboxes();
             OnComboReset?.Invoke();
         }
 
@@ -286,22 +280,6 @@ namespace KEY
             {
                 float nt = GetNormalizedTime(step);
 
-                // 히트박스 ON
-                if (!hitboxOn && nt >= hitboxStartRatio)
-                {
-                    hitboxOn = true;
-                    float dmg = _keyData.baseDamage * _keyData.GetComboMultiplier(step);
-                    DamageInfo info = BuildDamageInfo(dmg, StepToAttackType(step));
-                    _hitboxManager.EnableHitbox(step, info);
-                }
-
-                // 히트박스 OFF
-                if (hitboxOn && nt >= hitboxEndRatio)
-                {
-                    hitboxOn = false;
-                    _hitboxManager.DisableAllHitboxes();
-                }
-
                 // 콤보 창 구간 진입 감지
                 if (!windowReached && nt >= comboWindowRatio)
                     windowReached = true;
@@ -312,13 +290,11 @@ namespace KEY
 
                     if (_inputBuffered && !isFinal)
                     {
-                        // 버퍼 소비 → 다음 단계 시작 (Trigger 는 거기서 발행)
                         _currentStep = step + 1;
                         _comboCoroutine = StartCoroutine(ExecuteCombo(_currentStep));
                         yield break;
                     }
 
-                    // 버퍼 없음 or 피니셔 → 클립 끝까지 대기
                     if (nt >= 1.0f)
                         break;
                 }
@@ -326,8 +302,6 @@ namespace KEY
                 yield return null;
             }
 
-            // ③ 클립 종료 정리
-            _hitboxManager.DisableAllHitboxes();
             ComboReset();
         }
 
@@ -337,24 +311,6 @@ namespace KEY
         private IEnumerator ExecuteAirAttack(PlayerAirAttackDirection dir = PlayerAirAttackDirection.Side)
         {
             _isAttacking = true;
-
-            // 방향별 이벤트 발행 (MovementAnimator → Animator Trigger)
-            switch (dir)
-            {
-                case PlayerAirAttackDirection.Down:
-                    OnAirAttackDown?.Invoke();
-                    Debug.Log("[RustyKeyWeapon] 공중 하향 공격");
-                    break;
-                case PlayerAirAttackDirection.Up:
-                    OnAirAttackUp?.Invoke();
-                    Debug.Log("[RustyKeyWeapon] 공중 상향 공격");
-                    break;
-                default: // Side
-                    OnAirAttackSide?.Invoke();
-                    OnAirAttackStarted?.Invoke(); // 하위 호환
-                    Debug.Log("[RustyKeyWeapon] 공중 수평 공격");
-                    break;
-            }
 
             // 방향별 AttackType 및 DamageInfo
             AttackType attackType = dir switch
@@ -366,11 +322,28 @@ namespace KEY
 
             float dmg = _keyData.baseDamage * _keyData.airAttackMultiplier;
             DamageInfo info = BuildDamageInfo(dmg, attackType);
-            _hitboxManager.EnableHitbox(PlayerWeaponHitboxManager.HitboxAirAttack, info);
+            int hitboxIdx = PlayerWeaponHitboxManager.HitboxAirAttack;
 
-            yield return new WaitForSeconds(_keyData.hitboxDuration);
+            // 방향별 이벤트 발행 (MovementAnimator → Animator Trigger)
+            switch (dir)
+            {
+                case PlayerAirAttackDirection.Down:
+                    OnAirAttackDown?.Invoke(hitboxIdx, info);
+                    Debug.Log("[RustyKeyWeapon] 공중 하향 공격");
+                    break;
+                case PlayerAirAttackDirection.Up:
+                    OnAirAttackUp?.Invoke(hitboxIdx, info);
+                    Debug.Log("[RustyKeyWeapon] 공중 상향 공격");
+                    break;
+                default: // Side
+                    OnAirAttackSide?.Invoke(hitboxIdx, info);
+                    OnAirAttackStarted?.Invoke(hitboxIdx, info); // 하위 호환
+                    Debug.Log("[RustyKeyWeapon] 공중 수평 공격");
+                    break;
+            }
 
-            _hitboxManager.DisableAllHitboxes();
+            yield return new WaitForSeconds(_keyData.hitboxDuration + _keyData.returnDuration);
+
             ComboReset();
         }
 
@@ -430,11 +403,15 @@ namespace KEY
         /// </summary>
         private void FireComboEvent(int step)
         {
+            float dmg = _keyData.baseDamage * _keyData.GetComboMultiplier(step);
+            AttackType type = StepToAttackType(step);
+            DamageInfo info = BuildDamageInfo(dmg, type);
+
             switch (step)
             {
-                case 0: OnCombo1Started?.Invoke(); Debug.Log($"[RustyKeyWeapon] 콤보 1단계"); break;
-                case 1: OnCombo2Started?.Invoke(); Debug.Log($"[RustyKeyWeapon] 콤보 2단계"); break;
-                case 2: OnCombo3Started?.Invoke(); Debug.Log($"[RustyKeyWeapon] 콤보 3단계"); break;
+                case 0: OnCombo1Started?.Invoke(step, info); Debug.Log($"[RustyKeyWeapon] 콤보 1단계"); break;
+                case 1: OnCombo2Started?.Invoke(step, info); Debug.Log($"[RustyKeyWeapon] 콤보 2단계"); break;
+                case 2: OnCombo3Started?.Invoke(step, info); Debug.Log($"[RustyKeyWeapon] 콤보 3단계"); break;
                 default:
                     Debug.LogWarning($"[RustyKeyWeapon] 정의되지 않은 콤보 단계: {step}");
                     break;

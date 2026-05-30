@@ -56,6 +56,14 @@ namespace KEY
         [SerializeField] private PlayerWeaponMover _weaponMover;
 
         // ──────────────────────────────────────────
+        // 이벤트
+        // ──────────────────────────────────────────
+
+        private System.Action<int, DamageInfo>
+    _onCombo1, _onCombo2, _onCombo3,
+    _onAirSide, _onAirDown, _onAirUp, _onAirStarted;
+
+        // ──────────────────────────────────────────
         // 내부 참조
         // ──────────────────────────────────────────
 
@@ -102,13 +110,21 @@ namespace KEY
         {
             if (weapon is RustyKeyWeapon rusty)
             {
-                rusty.OnCombo1Started += HandleCombo1;
-                rusty.OnCombo2Started += HandleCombo2;
-                rusty.OnCombo3Started += HandleCombo3;
-                rusty.OnAirAttackStarted += HandleAirAttackSide; // 하위 호환
-                rusty.OnAirAttackSide += HandleAirAttackSide;
-                rusty.OnAirAttackDown += HandleAirAttackDown;
-                rusty.OnAirAttackUp += HandleAirAttackUp;
+                _onCombo1 = (i, d) => _weaponMover?.PlaySwing(AttackType.Combo1, i, d);
+                _onCombo2 = (i, d) => _weaponMover?.PlaySwing(AttackType.Combo2, i, d);
+                _onCombo3 = (i, d) => _weaponMover?.PlaySwing(AttackType.Combo3, i, d);
+                _onAirSide = (i, d) => _weaponMover?.PlaySwing(AttackType.AirAttack, i, d);
+                _onAirDown = (i, d) => _weaponMover?.PlaySwing(AttackType.AirAttackDown, i, d);
+                _onAirUp = (i, d) => _weaponMover?.PlaySwing(AttackType.AirAttackUp, i, d);
+                _onAirStarted = (i, d) => _weaponMover?.PlaySwing(AttackType.AirAttack, i, d);
+
+                rusty.OnCombo1Started += _onCombo1;
+                rusty.OnCombo2Started += _onCombo2;
+                rusty.OnCombo3Started += _onCombo3;
+                rusty.OnAirAttackSide += _onAirSide;
+                rusty.OnAirAttackDown += _onAirDown;
+                rusty.OnAirAttackUp += _onAirUp;
+                rusty.OnAirAttackStarted += _onAirStarted;
                 rusty.OnComboReset += HandleComboReset;
             }
         }
@@ -117,38 +133,16 @@ namespace KEY
         {
             if (weapon is RustyKeyWeapon rusty)
             {
-                rusty.OnCombo1Started -= HandleCombo1;
-                rusty.OnCombo2Started -= HandleCombo2;
-                rusty.OnCombo3Started -= HandleCombo3;
-                rusty.OnAirAttackStarted -= HandleAirAttackSide;
-                rusty.OnAirAttackSide -= HandleAirAttackSide;
-                rusty.OnAirAttackDown -= HandleAirAttackDown;
-                rusty.OnAirAttackUp -= HandleAirAttackUp;
+                rusty.OnCombo1Started -= _onCombo1;
+                rusty.OnCombo2Started -= _onCombo2;
+                rusty.OnCombo3Started -= _onCombo3;
+                rusty.OnAirAttackSide -= _onAirSide;
+                rusty.OnAirAttackDown -= _onAirDown;
+                rusty.OnAirAttackUp -= _onAirUp;
+                rusty.OnAirAttackStarted -= _onAirStarted;
                 rusty.OnComboReset -= HandleComboReset;
             }
         }
-
-        // ══════════════════════════════════════════════════════
-        // 이벤트 핸들러
-        // ══════════════════════════════════════════════════════
-
-        /// <summary> Combo1 — 수평 스윙 이동. </summary>
-        private void HandleCombo1() => _weaponMover?.PlaySwing(AttackType.Combo1);
-
-        /// <summary> Combo2 — 내리찍기 이동. </summary>
-        private void HandleCombo2() => _weaponMover?.PlaySwing(AttackType.Combo2);
-
-        /// <summary> Combo3 — 피니셔 이동 + 히트스탑. </summary>
-        private void HandleCombo3() => _weaponMover?.PlaySwing(AttackType.Combo3);
-
-        /// <summary> 공중 수평 공격 이동. </summary>
-        private void HandleAirAttackSide() => _weaponMover?.PlaySwing(AttackType.AirAttack);
-
-        /// <summary> 공중 하향 내리찍기 이동. </summary>
-        private void HandleAirAttackDown() => _weaponMover?.PlaySwing(AttackType.AirAttackDown);
-
-        /// <summary> 공중 상향 공격 이동. </summary>
-        private void HandleAirAttackUp() => _weaponMover?.PlaySwing(AttackType.AirAttackUp);
 
         /// <summary> 콤보 리셋 → 스윙 취소 + 원점 복귀. </summary>
         private void HandleComboReset() => _weaponMover?.CancelSwing();
