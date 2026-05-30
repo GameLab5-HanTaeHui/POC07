@@ -24,7 +24,7 @@ TagManager:
   - EnemyAttackHit
   - EnemyLock
   - EnemyShield
-  - 
+  - EnemySeal
   - Ground
   - Wall
   - 

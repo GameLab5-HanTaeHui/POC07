@@ -338,7 +338,7 @@ namespace KEY
             var sealProjectile = go.GetComponent<SealProjectile>();
             if (sealProjectile != null)
             {
-                sealProjectile.Launch(data, _facingOverride, chargePower);
+                sealProjectile.Launch(data, GetFireDirection(data), chargePower);
                 Debug.Log($"[PlayerChargeAttack] 봉인 발사 — 방향:{_facingOverride} 파워:{chargePower:F2}");
                 EndCharge();
                 return;

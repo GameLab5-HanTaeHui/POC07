@@ -120,7 +120,7 @@ namespace KEY
         ///   direction  : 발사 방향 (+1 = 오른쪽, -1 = 왼쪽)
         ///   chargePower: 차징 비율 0~1 (속도/크기 비율)
         /// </summary>
-        public void Launch(KeyDataSO keyData, float direction, float chargePower)
+        public void Launch(KeyDataSO keyData, Vector2 direction, float chargePower)
         {
             if (keyData == null)
             {
@@ -138,11 +138,14 @@ namespace KEY
 
             // 스프라이트 방향 반전
             if (_spriteRenderer != null)
-                _spriteRenderer.flipX = direction < 0f;
+                _spriteRenderer.flipX = direction.x < 0f;
 
             // 속도 — chargePower 에 비례
             float speed = keyData.sealProjectileSpeed * Mathf.Lerp(0.6f, 1.4f, chargePower);
-            _rigid2D.linearVelocity = new Vector2(direction * speed, 0f);
+            _rigid2D.linearVelocity = direction * speed;
+
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
 
             // DOTween 발사 임팩트
             transform.DOPunchScale(
