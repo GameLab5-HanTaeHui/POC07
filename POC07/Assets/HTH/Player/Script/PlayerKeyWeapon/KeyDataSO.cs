@@ -114,67 +114,123 @@ namespace KEY
         // ──────────────────────────────────────────
         // 콤보별 스윙 수치
         // ──────────────────────────────────────────
+        // ──────────────────────────────────────────
+        // 콤보별 스윙 위치/회전 수치 (v1.6)
+        // ──────────────────────────────────────────
 
-        [Header("── 콤보별 스윙 수치 ──────────────────────")]
-
-        /// <summary>
-        /// 백스윙 거리 (units).
-        /// 공격 전 무기를 반대 방향으로 당기는 준비 동작 거리.
-        /// </summary>
-        [Tooltip("백스윙 거리 (units). 공격 전 반대 방향으로 당기는 거리. 권장: 0.1~0.25")]
-        [Min(0f)]
-        [SerializeField] public float backswingDistance = 0.15f;
+        [Header("── 콤보별 스윙 위치/회전 ──────────────────────")]
 
         /// <summary>
-        /// 백스윙 지속 시간 (초).
+        /// 공통 타이밍. 모든 콤보에 동일 적용.
         /// </summary>
-        [Tooltip("백스윙 지속 시간 (초). 권장: 0.05~0.08")]
+        [Tooltip("백스윙 이동 시간 (초). 권장: 0.06~0.08")]
         [Min(0.01f)]
-        [SerializeField] public float backswingDuration = 0.06f;
+        [SerializeField] public float backswingDuration = 0.2f;
 
-        /// <summary>
-        /// Combo1 타격 이동 거리 (units). 가로 횡베기 X 전진.
-        /// </summary>
-        [Tooltip("Combo1 타격 거리 (units). 가로 횡베기 X 전진. 권장: 0.35~0.5")]
-        [Min(0f)]
-        [SerializeField] public float combo1AttackDistance = 0.45f;
+        [Tooltip("타격 이동 시간 (초). 권장: 0.08~0.12")]
+        [Min(0.01f)]
+        [SerializeField] public float attackDuration = 0.1f;
 
-        /// <summary>
-        /// Combo1 타격 시 Z축 회전 각도 (도). 칼날 아래로 향하는 횡베기 느낌.
-        /// facing 방향에 따라 부호 자동 적용됨.
-        /// </summary>
-        [Tooltip("Combo1 Z축 회전 (도). 횡베기 칼날 기울기. 권장: 25~40")]
-        [Range(0f, 90f)]
-        [SerializeField] public float combo1RotationZ = 35f;
+        // ── Combo1 — 가로 횡베기 ──────────────────────────
 
-        /// <summary>
-        /// Combo2 내리찍기 Y 하향 타격 거리 (units).
-        /// </summary>
-        [Tooltip("Combo2 Y 하향 타격 거리 (units). 내리찍기. 권장: 0.3~0.5")]
-        [Min(0f)]
-        [SerializeField] public float combo2AttackDistanceY = 0.4f;
+        /// <summary>Combo1 백스윙 손잡이 위치 (Player 로컬 기준, 오른쪽 facing)</summary>
+        [Tooltip("Combo1 백스윙 위치. 손잡이를 몸 앞/위로 당기는 지점.")]
+        [SerializeField] public Vector2 combo1BackPos = new Vector2(-0.7f, -0.4f);
 
-        /// <summary>
-        /// Combo2 타격 시 Z축 회전 각도 (도). 내리찍기 칼날 기울기.
-        /// </summary>
-        [Tooltip("Combo2 Z축 회전 (도). 내리찍기 칼날 기울기. 권장: 20~35")]
-        [Range(0f, 90f)]
-        [SerializeField] public float combo2RotationZ = 25f;
+        /// <summary>Combo1 타격 손잡이 위치</summary>
+        [Tooltip("Combo1 타격 위치. 전방으로 크게 휩쓰는 지점.")]
+        [SerializeField] public Vector2 combo1AttackPos = new Vector2(2f, -0.1f);
 
-        /// <summary>
-        /// Combo3 찌르기 X 전진 타격 거리 (units). 가장 큰 전진.
-        /// </summary>
-        [Tooltip("Combo3 타격 거리 (units). 찌르기 피니셔 X 전진. 권장: 0.5~0.7")]
-        [Min(0f)]
-        [SerializeField] public float combo3AttackDistance = 0.6f;
+        /// <summary>Combo1 백스윙 시 Z축 회전 (양수=반시계=날이 위로)</summary>
+        [Tooltip("Combo1 백스윙 Z회전. 양수=날이 위. 권장: -60")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float combo1RotBack = -60f;
 
-        /// <summary>
-        /// 공중 공격 Z축 회전 기본 각도 (도).
-        /// AirSide / AirDown / AirUp 에 각각 부호를 다르게 적용.
-        /// </summary>
-        [Tooltip("공중 공격 Z축 회전 기본 각도 (도). 권장: 40~60")]
-        [Range(0f, 90f)]
-        [SerializeField] public float airAttackRotationZ = 50f;
+        /// <summary>Combo1 타격 시 Z축 회전 (음수=시계=날이 아래로 휩쓸림)</summary>
+        [Tooltip("Combo1 타격 Z회전. 음수=날이 아래로. 권장: 40")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float combo1RotAtk = 40f;
+
+        // ── Combo2 — 내리찍기 ──────────────────────────────
+
+        /// <summary>Combo2 백스윙 손잡이 위치 (머리 위)</summary>
+        [Tooltip("Combo2 백스윙 위치. 머리 위로 들어올리는 지점.")]
+        [SerializeField] public Vector2 combo2BackPos = new Vector2(-1.0f, 1.2f);
+
+        /// <summary>Combo2 타격 손잡이 위치 (발 아래)</summary>
+        [Tooltip("Combo2 타격 위치. 발 아래로 내리찍는 지점.")]
+        [SerializeField] public Vector2 combo2AttackPos = new Vector2(2.0f, -0.2f);
+
+        /// <summary>Combo2 백스윙 Z회전 (-90 = 날이 하늘을 향함)</summary>
+        [Tooltip("Combo2 백스윙 Z회전. -90=날이 위. 권장: 120")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float combo2RotBack = 120f;
+
+        /// <summary>Combo2 타격 Z회전 (+90 = 날이 땅을 향함)</summary>
+        [Tooltip("Combo2 타격 Z회전. +90=날이 아래. 권장: 0")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float combo2RotAtk = 0f;
+
+        // ── Combo3 — 찌르기 피니셔 ────────────────────────
+
+        /// <summary>Combo3 백스윙 손잡이 위치 (당기기)</summary>
+        [Tooltip("Combo3 백스윙 위치. 손잡이를 몸 앞으로 당기는 지점.")]
+        [SerializeField] public Vector2 combo3BackPos = new Vector2(-1f, 0.0f);
+
+        /// <summary>Combo3 타격 손잡이 위치 (최대 전방 찌르기)</summary>
+        [Tooltip("Combo3 타격 위치. 전방 최대 사거리 찌르기 지점.")]
+        [SerializeField] public Vector2 combo3AttackPos = new Vector2(2.2f, 0.0f);
+
+        // Combo3 회전 없음 — 직선 찌르기
+
+        // ── AirSide — 공중 수평 횡베기 ────────────────────
+        [Header("── 공중 공격 스윙 ──────────────────────")]
+
+        [Tooltip("AirSide 백스윙 위치.")]
+        [SerializeField] public Vector2 airSideBackPos = new Vector2(1f, 1f);
+
+        [Tooltip("AirSide 타격 위치.")]
+        [SerializeField] public Vector2 airSideAttackPos = new Vector2(2f, -1f);
+
+        [Tooltip("AirSide 백스윙 Z회전. 권장: 80")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airSideRotBack = 80f;
+
+        [Tooltip("AirSide 타격 Z회전. 권장: -80")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airSideRotAtk = -80f;
+
+        // ── AirDown — 공중 내리찍기 ───────────────────────
+
+        [Tooltip("AirDown 백스윙 위치. 머리 위 최대 높이.")]
+        [SerializeField] public Vector2 airDownBackPos = new Vector2(-1.0f, -1.0f);
+
+        [Tooltip("AirDown 타격 위치. 발 아래 최대 깊이.")]
+        [SerializeField] public Vector2 airDownAttackPos = new Vector2(1.0f, -1.0f);
+
+        [Tooltip("AirDown 백스윙 Z회전. 권장: -150")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airDownRotBack = -150f;
+
+        [Tooltip("AirDown 타격 Z회전. 권장: -80")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airDownRotAtk = -80f;
+
+        // ── AirUp — 공중 상향 퍼올리기 ────────────────────
+
+        [Tooltip("AirUp 백스윙 위치. 발 아래.")]
+        [SerializeField] public Vector2 airUpBackPos = new Vector2(-1.0f, 1.0f);
+
+        [Tooltip("AirUp 타격 위치. 머리 위.")]
+        [SerializeField] public Vector2 airUpAttackPos = new Vector2(1.0f, 1.0f);
+
+        [Tooltip("AirUp 백스윙 Z회전. 권장: 150")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airUpRotBack = 150f;
+
+        [Tooltip("AirUp 타격 Z회전. 권장: 80")]
+        [Range(-180f, 180f)]
+        [SerializeField] public float airUpRotAtk = 80f;
 
         // ──────────────────────────────────────────
         // 스윙 이동 수치
@@ -188,7 +244,7 @@ namespace KEY
 
         [Tooltip("스윙 이동 시간 (초).")]
         [Min(0.01f)]
-        [SerializeField] public float swingDuration = 0.08f;
+        [SerializeField] public float swingDuration = 0.1f;
 
         [Tooltip("원점 복귀 시간 (초).")]
         [Min(0.01f)]
@@ -214,7 +270,7 @@ namespace KEY
 
         [Tooltip("방향키 ↑↓ 초당 각도 변화량.")]
         [Range(1f, 100f)]
-        [SerializeField] public float chargeAimAngleStep = 15f;
+        [SerializeField] public float chargeAimAngleStep = 80f;
 
         [Tooltip("발사 각도 최대 범위 (도). ±범위 내로 제한.")]
         [Range(0f, 90f)]

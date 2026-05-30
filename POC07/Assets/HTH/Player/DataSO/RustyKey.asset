@@ -27,16 +27,32 @@ MonoBehaviour:
   - 1.2
   - 1.5
   airAttackMultiplier: 1.3
-  backswingDistance: 0.15
-  backswingDuration: 0.06
-  combo1AttackDistance: 0.45
-  combo1RotationZ: 35
-  combo2AttackDistanceY: 0.4
-  combo2RotationZ: 25
-  combo3AttackDistance: 0.6
-  airAttackRotationZ: 50
+  backswingDuration: 0.7
+  attackDuration: 0.5
+  combo1BackPos: {x: -0.7, y: -0.4}
+  combo1AttackPos: {x: 2, y: -0.1}
+  combo1RotBack: -60
+  combo1RotAtk: 40
+  combo2BackPos: {x: -1, y: 1.2}
+  combo2AttackPos: {x: 2, y: -0.2}
+  combo2RotBack: 120
+  combo2RotAtk: 0
+  combo3BackPos: {x: -1, y: 0}
+  combo3AttackPos: {x: 2.2, y: 0}
+  airSideBackPos: {x: 1, y: 1}
+  airSideAttackPos: {x: 2, y: -1}
+  airSideRotBack: 80
+  airSideRotAtk: -80
+  airDownBackPos: {x: -1, y: -1}
+  airDownAttackPos: {x: 1, y: -1}
+  airDownRotBack: -150
+  airDownRotAtk: -80
+  airUpBackPos: {x: -1, y: 1}
+  airUpAttackPos: {x: 1, y: 1}
+  airUpRotBack: 150
+  airUpRotAtk: 80
   swingDistance: 0.5
-  swingDuration: 0.08
+  swingDuration: 0.1
   returnDuration: 0.15
   airSwingDistance: 0.4
   minChargeTime: 0.3
