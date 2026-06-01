@@ -136,6 +136,16 @@ namespace KEY
         [Tooltip("TestBossDataSO. 필수 연결.")]
         [SerializeField] private TestBossDataSO _data;
 
+        [Header("── 봉인 수치 ──────────────────────")]
+
+        /// <summary>
+        /// 봉인 투사체 팔 봉인 지속 시간 (초).
+        /// Warning 중 봉인 투사체 적중 시 해당 팔의 패턴이 이 시간 동안 비활성.
+        /// </summary>
+        [Tooltip("봉인 투사체 팔 봉인 지속 시간 (초). 권장: 3.0~6.0.")]
+        [Range(1f, 15f)]
+        [SerializeField] private float _armSealDuration = 4.0f;
+
         [Header("── 패턴 목록 ──────────────────────")]
 
         /// <summary>
@@ -179,6 +189,13 @@ namespace KEY
         private Rigidbody2D _rigid2D;
         private SpriteRenderer _spriteRenderer;
         private TestBossCore _core;
+
+        /// <summary>
+        /// 보스 본체 봉인 상태 관리.
+        /// 루트 오브젝트에 부착된 SealComponent.
+        /// SealProjectile 이 Enemy 레이어 명중 시 자동으로 ApplySeal() 호출됨.
+        /// </summary>
+        private SealComponent _sealComponent;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -254,6 +271,7 @@ namespace KEY
             _rigid2D = GetComponent<Rigidbody2D>();
             _spriteRenderer = GetComponent<SpriteRenderer>();
             _core = GetComponent<TestBossCore>();
+            _sealComponent = GetComponent<SealComponent>();
         }
 
         private void Start()
@@ -291,6 +309,7 @@ namespace KEY
             {
                 if (pattern == null) continue;
                 pattern.OnPatternGroggy += HandlePatternGroggy;
+                pattern.OnPatternSealHit += HandlePatternSealHit;
             }
 
             Debug.Log("[TestBossAI] 초기화 완료.");
@@ -311,6 +330,7 @@ namespace KEY
             {
                 if (pattern == null) continue;
                 pattern.OnPatternGroggy -= HandlePatternGroggy;
+                pattern.OnPatternSealHit -= HandlePatternSealHit;
             }
         }
 
@@ -482,12 +502,29 @@ namespace KEY
             if (_currentPattern != null) return;
             if (_patterns == null || _patterns.Count == 0) return;
 
+            // 보스 전체 봉인 (SealType.Attack) 확인 → 모든 패턴 스킵
+            if (_sealComponent != null &&
+                _sealComponent.IsSealedAction(SealType.Attack))
+            {
+                Debug.Log("[TestBossAI] 공격 봉인 상태 → 패턴 선택 스킵");
+                return;
+            }
+
             // 실행 가능 패턴 수집
+            // CanExecute (쿨타임) + CanPatternExecute (팔 투사체봉인 아님) 모두 통과해야 선택
             var available = new List<TestBossPatternBase>();
             foreach (var p in _patterns)
             {
-                if (p != null && p.CanExecute)
-                    available.Add(p);
+                if (p == null) continue;
+                if (!p.CanExecute) continue;
+
+                // 봉인된 팔을 사용하는 패턴 스킵
+                // TestBossArmPart.CanPatternExecute 가 false = 투사체 봉인 중
+                // 각 패턴의 _sealableArm 이 설정된 경우에만 체크
+                if (p is TestBossPattern_PunchDown down && !down.IsArmAvailable) continue;
+                if (p is TestBossPattern_PunchShot shot && !shot.IsArmAvailable) continue;
+
+                available.Add(p);
             }
 
             if (available.Count == 0) return;
@@ -683,6 +720,36 @@ namespace KEY
                 _core.EnterGroggy();
         }
 
+        /// <summary>
+        /// TestBossPatternBase.OnPatternSealHit 수신.
+        /// Warning / Active 중 봉인 투사체가 팔에 적중했을 때 호출.
+        ///
+        /// [처리 순서]
+        ///   1. 해당 팔에 투사체 봉인 적용
+        ///      (_armSealDuration 동안 CanPatternExecute = false)
+        ///   2. TestBossCore.EnterGroggy() 호출
+        ///      → 플레이어에게 처형 기회 제공
+        ///
+        /// [기획 — Key_BOSSTest.md]
+        ///   "차징 시전 중 봉인 기능을 적중 시 일시적으로 주먹 기능 봉인됨"
+        ///   "봉인 시 제자리로 돌아가고 플레이어와 거리를 벌릴려고 함"
+        ///   → 팔 복귀 + 보스 후퇴는 각 패턴의 Interrupt() 에서 DOTween 처리.
+        /// </summary>
+        /// <param name="sealedArm">봉인 투사체가 적중한 TestBossArmPart.</param>
+        private void HandlePatternSealHit(TestBossArmPart sealedArm)
+        {
+            if (sealedArm == null) return;
+
+            // 1. 해당 팔 투사체 봉인 적용 (패턴 선택에서 제외됨)
+            sealedArm.ApplySealByProjectile(_armSealDuration);
+
+            // 2. 그로기 진입 → 플레이어 처형 기회
+            if (_core != null)
+                _core.EnterGroggy();
+
+            Debug.Log($"[TestBossAI] 봉인 적중 → {sealedArm.PartType} 봉인 {_armSealDuration:F1}초 + 그로기 진입");
+        }
+
         // ══════════════════════════════════════════════════════
         // 유틸리티
         // ══════════════════════════════════════════════════════
@@ -740,10 +807,14 @@ namespace KEY
             };
 
             UnityEditor.Handles.color = stateColor;
+            bool isSealed = _sealComponent != null &&
+                            _sealComponent.IsSealedAction(SealType.Attack);
+
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * 3.5f,
                 $"[AI] {_currentState}  Stopped:{_isStopped}  " +
-                $"Pattern:{(_currentPattern != null ? _currentPattern.GetType().Name : "없음")}");
+                $"Pattern:{(_currentPattern != null ? _currentPattern.GetType().Name : "없음")}  " +
+                $"Sealed:{isSealed}");
 #endif
         }
     }

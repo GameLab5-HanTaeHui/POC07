@@ -157,9 +157,9 @@ namespace KEY
         /// 발사 방향에 따라 부호 자동 결정.
         /// 권투 선수가 팔을 뒤로 당기는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: 25~50.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = 35f;
+        [SerializeField] private float _windupRotate = -90f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -172,9 +172,9 @@ namespace KEY
         /// Active 발사 시 앞으로 오버슈트 회전각 (도).
         /// 주먹이 힘차게 뻗어나가는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 10~25.")]
+        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _shotOvershoot = 15f;
+        [SerializeField] private float _shotOvershoot = 90f;
 
         // ──────────────────────────────────────────
         // Inspector — 봉인 후퇴
@@ -201,6 +201,17 @@ namespace KEY
 
         [Tooltip("Active 발사 순간 팔 색상 (흰색 플래시).")]
         [SerializeField] private Color _activeColor = Color.white;
+
+        // ──────────────────────────────────────────
+        // 프로퍼티
+        // ──────────────────────────────────────────
+
+        /// <summary>
+        /// 이 패턴이 사용하는 팔이 실행 가능한지 여부.
+        /// TestBossAI.TrySelectPattern() 에서 체크.
+        /// </summary>
+        public bool IsArmAvailable
+            => _armPart == null || _armPart.CanPatternExecute;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -254,6 +265,9 @@ namespace KEY
                 _playerTransform = players[0].transform;
 
             _triggerGroggyOnRecovery = true;
+
+            // 봉인 감지 대상 팔 등록
+            SetSealableArm(_armPart);
         }
 
         private void OnDestroy()

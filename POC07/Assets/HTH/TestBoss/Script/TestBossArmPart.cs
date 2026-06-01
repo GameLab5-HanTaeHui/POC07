@@ -6,9 +6,14 @@
 //   핵심 플레이 루프의 "팔 봉인" 단계를 담당.
 //   팔 1개당 1개의 컴포넌트를 부착 (Arm_L / Arm_R).
 //
-// [상태]
+// [상태 — A키 처형 봉인]
 //   IsUnlocked = true  : 팔이 해제(풀린) 상태 — 붉은색 (시작 상태)
-//   IsUnlocked = false : 팔이 봉인(잠긴) 상태 — 파란색
+//   IsUnlocked = false : 팔이 봉인(잠긴) 상태 — 파란색 (A키 홀드 처형으로 진입)
+//
+// [상태 — 봉인 투사체 봉인]
+//   _isSealedByProjectile = true  : 봉인 투사체 적중 → 일시적 패턴 기능 봉인
+//   CanPatternExecute = false      : 투사체 봉인 중 이 팔의 패턴 실행 불가
+//   봉인 시간 경과 후 자동 해제
 //
 // [전환]
 //   ReLock()       : 해제 → 봉인 (A키 홀드 처형으로 호출됨)
@@ -83,6 +88,17 @@ namespace KEY
         /// <summary> 팔 해제 여부. true = 해제(붉은), false = 봉인(파란). </summary>
         private bool _isUnlocked = true;
 
+        /// <summary>
+        /// 봉인 투사체 적중 봉인 여부.
+        /// Warning 중 SealProjectile 이 이 팔에 명중하면 true.
+        /// _projectileSealTimer 경과 후 자동 false.
+        /// CanPatternExecute = false → 이 팔의 패턴 선택 스킵.
+        /// </summary>
+        private bool _isSealedByProjectile;
+
+        /// <summary> 투사체 봉인 잔여 시간. </summary>
+        private float _projectileSealTimer;
+
         /// <summary> DataSO 참조. TestBossCore 에서 Initialize() 로 주입. </summary>
         private TestBossDataSO _data;
 
@@ -118,6 +134,16 @@ namespace KEY
         public bool IsLocked => !_isUnlocked;
 
         /// <summary>
+        /// 이 팔의 패턴 실행 가능 여부.
+        /// A키 처형 봉인(IsLocked) 또는 투사체 봉인(_isSealedByProjectile) 중 하나라도
+        /// 활성이면 false → TestBossAI.TrySelectPattern() 에서 해당 팔 패턴 스킵.
+        /// </summary>
+        public bool CanPatternExecute => !_isSealedByProjectile;
+
+        /// <summary> 투사체 봉인 활성 여부. </summary>
+        public bool IsSealedByProjectile => _isSealedByProjectile;
+
+        /// <summary>
         /// 처형 감지 범위.
         /// _executionRangeOverride 가 0 이하면 DataSO 기본값 사용.
         /// </summary>
@@ -134,6 +160,16 @@ namespace KEY
             // SpriteRenderer 자동 탐색
             if (_spriteRenderer == null)
                 _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        private void Update()
+        {
+            // 투사체 봉인 타이머 감소
+            if (!_isSealedByProjectile) return;
+
+            _projectileSealTimer -= Time.deltaTime;
+            if (_projectileSealTimer <= 0f)
+                ReleaseSealByProjectile();
         }
 
         // ══════════════════════════════════════════════════════
@@ -219,6 +255,34 @@ namespace KEY
             _spriteRenderer.color = _isUnlocked
                 ? _data.armUnlockedColor
                 : _data.armLockedColor;
+        }
+
+        /// <summary>
+        /// 봉인 투사체 적중으로 일시 봉인. (외부 API)
+        /// Warning 중 SealProjectile 명중 시 TestBossArmSealReceiver 에서 호출.
+        /// </summary>
+        /// <param name="duration">봉인 지속 시간 (초).</param>
+        public void ApplySealByProjectile(float duration)
+        {
+            _isSealedByProjectile = true;
+            _projectileSealTimer = duration;
+
+            // 색상 피드백: 초록색 (투사체 봉인 = 기능 정지)
+            if (_spriteRenderer != null)
+                _spriteRenderer.color = new Color(0.2f, 0.9f, 0.4f, 1f);
+
+            Debug.Log($"[TestBossArmPart] {_partType} 투사체 봉인 적용 ({duration:F1}초)");
+        }
+
+        /// <summary>
+        /// 투사체 봉인 해제. 타이머 만료 시 자동 호출.
+        /// </summary>
+        private void ReleaseSealByProjectile()
+        {
+            _isSealedByProjectile = false;
+            _projectileSealTimer = 0f;
+            RestoreArmColor(); // 봉인 상태 색상으로 복구
+            Debug.Log($"[TestBossArmPart] {_partType} 투사체 봉인 해제");
         }
 
         /// <summary>

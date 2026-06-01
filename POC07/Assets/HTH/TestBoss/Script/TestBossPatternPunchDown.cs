@@ -144,9 +144,9 @@ namespace KEY
         /// 양수 = 반시계 방향 (Arm_L 기준 뒤로 젖힘).
         /// 팔이 내리찍기 직전 크게 들어올리는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: 30~60.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -35~-45.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = 45f;
+        [SerializeField] private float _windupRotate = -35f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -160,14 +160,26 @@ namespace KEY
         /// 0도로 복귀할 때 살짝 앞으로 더 회전하는 오버슈트.
         /// 망치처럼 세게 내려치는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 내리찍기 오버슈트 회전각 (도). 권장: 15~30.")]
+        [Tooltip("Active 내리찍기 오버슈트 회전각 (도). 권장: 70~90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _slamOvershoot = 20f;
+        [SerializeField] private float _slamOvershoot = 80f;
 
         [Header("── 색상 피드백 ──────────────────────")]
 
         [Tooltip("Warning 팔 색상 (주황).")]
         [SerializeField] private Color _warningColor = new Color(1f, 0.55f, 0.1f, 1f);
+
+        // ──────────────────────────────────────────
+        // 프로퍼티
+        // ──────────────────────────────────────────
+
+        /// <summary>
+        /// 이 패턴이 사용하는 팔이 실행 가능한지 여부.
+        /// _armPart.CanPatternExecute == false (투사체 봉인 중) 이면 false.
+        /// TestBossAI.TrySelectPattern() 에서 체크.
+        /// </summary>
+        public bool IsArmAvailable
+            => _armPart == null || _armPart.CanPatternExecute;
 
         // ──────────────────────────────────────────
         // 내부 상태
@@ -219,6 +231,9 @@ namespace KEY
                 _playerTransform = players[0].transform;
 
             _triggerGroggyOnRecovery = true;
+
+            // 봉인 감지 대상 팔 등록 (베이스 클래스 WaitScaled 에서 체크)
+            SetSealableArm(_armPart);
         }
 
         private void OnDestroy()

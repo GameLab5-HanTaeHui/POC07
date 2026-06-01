@@ -30,6 +30,14 @@
 //   → TestBossAI 가 구독하여 EnterGroggy() 호출
 //   → 플레이어에게 처형 기회 제공
 //
+// [봉인 투사체 감지 구조 (v1.1 추가)]
+//   TestBossPatternBase 는 _sealableArm 을 참조.
+//   Warning / Active 중 매 프레임 _sealableArm.IsSealedByProjectile 체크.
+//   봉인 감지 시:
+//     1. Interrupt() 호출 (패턴 중단)
+//     2. OnPatternSealHit 이벤트 발행 → TestBossAI 가 구독하여 그로기 진입
+//   → 기획: "차징 시전 중 봉인 기능을 적중 시 일시적으로 주먹 기능 봉인됨"
+//
 // [네임스페이스]
 //   namespace : KEY
 // ============================================================
@@ -110,6 +118,13 @@ namespace KEY
         /// <summary> 강제 중단 플래그. WaitScaled 내부에서 체크. </summary>
         protected bool _isInterrupted;
 
+        /// <summary>
+        /// 봉인 감지 대상 팔 부위.
+        /// Warning/Active 중 이 팔이 투사체 봉인을 받으면 패턴 중단.
+        /// 하위 클래스(PunchDown/PunchShot) 의 Initialize() 에서 주입.
+        /// </summary>
+        protected TestBossArmPart _sealableArm;
+
         // ──────────────────────────────────────────
         // 이벤트
         // ──────────────────────────────────────────
@@ -125,6 +140,13 @@ namespace KEY
         /// TestBossAI 에서 상태 전환에 사용.
         /// </summary>
         public event Action<TestBossPatternBase> OnPatternEnd;
+
+        /// <summary>
+        /// Warning/Active 중 봉인 투사체 적중 시 발행.
+        /// TestBossAI 가 구독 → EnterGroggy() 호출.
+        /// 파라미터: 봉인된 TestBossArmPart
+        /// </summary>
+        public event Action<TestBossArmPart> OnPatternSealHit;
 
         /// <summary>
         /// 그로기 진입 조건 충족 시 발행.
@@ -260,13 +282,10 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 중단 체크 포함 대기.
+        /// 중단 + 봉인 체크 포함 대기.
         /// 하위 클래스에서 yield return WaitScaled(시간) 으로 사용.
-        ///
-        /// [BossPatternBase.WaitScaled 와의 차이]
-        ///   SpeedMultiplier 없음 (팔 봉인 시스템 미포함)
-        ///   Pause 없음 (Counter 시스템 미포함)
-        ///   _isInterrupted 체크만 유지
+        /// _sealableArm 이 연결되어 있으면 매 프레임 투사체 봉인 여부 체크.
+        /// 봉인 감지 시 Interrupt() + OnPatternSealHit 발행.
         /// </summary>
         /// <param name="duration">대기 시간 (초).</param>
         protected IEnumerator WaitScaled(float duration)
@@ -276,6 +295,13 @@ namespace KEY
             while (elapsed < duration)
             {
                 if (_isInterrupted) yield break;
+
+                // ★ 봉인 투사체 감지 체크
+                if (_sealableArm != null && _sealableArm.IsSealedByProjectile)
+                {
+                    HandleSealHit();
+                    yield break;
+                }
 
                 elapsed += Time.deltaTime;
                 yield return null;
@@ -289,6 +315,28 @@ namespace KEY
         protected void TriggerGroggy()
         {
             OnPatternGroggy?.Invoke();
+        }
+
+        /// <summary>
+        /// 봉인 투사체 적중 처리.
+        /// WaitScaled() 내부에서 _sealableArm.IsSealedByProjectile 감지 시 호출.
+        /// 패턴 중단 + OnPatternSealHit 발행 → TestBossAI 가 그로기 진입.
+        /// </summary>
+        private void HandleSealHit()
+        {
+            Interrupt();
+            OnPatternSealHit?.Invoke(_sealableArm);
+            Debug.Log($"[{GetType().Name}] 봉인 투사체 적중 → 패턴 중단 + 그로기 유도");
+        }
+
+        /// <summary>
+        /// 봉인 감지 대상 팔 설정.
+        /// 하위 클래스 Awake() 에서 호출.
+        /// </summary>
+        /// <param name="arm">봉인 감지할 TestBossArmPart.</param>
+        public void SetSealableArm(TestBossArmPart arm)
+        {
+            _sealableArm = arm;
         }
     }
 }
