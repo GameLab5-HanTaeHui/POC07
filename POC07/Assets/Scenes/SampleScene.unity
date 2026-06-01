@@ -83437,6 +83437,10 @@ PrefabInstance:
       propertyPath: _shieldLayer.m_Bits
       value: 262144
       objectReference: {fileID: 0}
+    - target: {fileID: 4397083486284290997, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
+      propertyPath: _knockbackForce
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 6183250107901851475, guid: caedceacef5019b43ac28b0cf13f8915, type: 3}
       propertyPath: _attackBlocked
       value: 0
