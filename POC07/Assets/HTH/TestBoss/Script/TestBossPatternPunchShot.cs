@@ -157,9 +157,9 @@ namespace KEY
         /// 발사 방향에 따라 부호 자동 결정.
         /// 권투 선수가 팔을 뒤로 당기는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -90.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -35~-45.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = -90f;
+        [SerializeField] private float _windupRotate = -35f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -172,9 +172,9 @@ namespace KEY
         /// Active 발사 시 앞으로 오버슈트 회전각 (도).
         /// 주먹이 힘차게 뻗어나가는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 90.")]
+        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 70~80")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _shotOvershoot = 90f;
+        [SerializeField] private float _shotOvershoot = 80f;
 
         // ──────────────────────────────────────────
         // Inspector — 봉인 후퇴
@@ -418,7 +418,7 @@ namespace KEY
         /// 강제 중단 (봉인 적중 포함).
         /// 팔 원위치 + 회전 복귀 + 봉인 색상 복구 + 보스 후퇴.
         /// </summary>
-        public new void Interrupt()
+        public override void Interrupt()
         {
             base.Interrupt();
             KillArmTweens();

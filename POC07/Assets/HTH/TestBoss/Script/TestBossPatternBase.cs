@@ -267,8 +267,14 @@ namespace KEY
         /// TestBossAI 에서 Groggy 진입 시 호출.
         /// _isInterrupted = true → WaitScaled 자연 종료.
         /// </summary>
-        public void Interrupt()
+        public virtual void Interrupt()
         {
+            // ★ 이중 실행 가드
+            // HandleSealHit() → Interrupt() 후 OnPatternSealHit 발행
+            // → TestBossAI.HandleGroggyEnter() 가 _currentPattern.Interrupt() 재호출
+            // → _isInterrupted 이미 true이면 DOTween/코루틴 중복 실행 차단
+            if (_isInterrupted) return;
+
             _isInterrupted = true;
             _isExecuting = false;
             _cooldownTimer = _cooldown;
@@ -324,9 +330,19 @@ namespace KEY
         /// </summary>
         private void HandleSealHit()
         {
+            // ★ Interrupt() 먼저 호출 → 하위 클래스 override 실행
+            //   PunchDown: DOTween 팔 원위치 복귀
+            //   PunchShot: DOTween 팔 원위치 복귀 + 보스 후퇴
             Interrupt();
+
+            // ★ OnPatternSealHit 발행 → TestBossAI.HandlePatternSealHit()
+            //   → sealedArm.ApplySealByProjectile() + EnterGroggy()
+            //   EnterGroggy() 내부에서 AI가 HandleGroggyEnter() 수신
+            //   → _currentPattern.Interrupt() 를 다시 호출하려 하지만
+            //     _isInterrupted = true 이므로 베이스 Interrupt() 내부에서
+            //     이중 실행을 차단 (아래 Interrupt()에 가드 추가됨)
             OnPatternSealHit?.Invoke(_sealableArm);
-            Debug.Log($"[{GetType().Name}] 봉인 투사체 적중 → 패턴 중단 + 그로기 유도");
+            Debug.Log($"[{GetType().Name}] 봉인 투사체 적중 → 팔 복귀 DOTween + 그로기 유도");
         }
 
         /// <summary>

@@ -171,7 +171,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KEY.SealProjectile
   _sealLayer:
     serializedVersion: 2
-    m_Bits: 32768
+    m_Bits: 524288
   _shieldLayer:
     serializedVersion: 2
     m_Bits: 262144
