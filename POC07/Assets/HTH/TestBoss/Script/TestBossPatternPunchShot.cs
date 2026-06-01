@@ -157,9 +157,9 @@ namespace KEY
         /// 발사 방향에 따라 부호 자동 결정.
         /// 권투 선수가 팔을 뒤로 당기는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -90.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -35~-45.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = -90f;
+        [SerializeField] private float _windupRotate = -35f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -172,20 +172,15 @@ namespace KEY
         /// Active 발사 시 앞으로 오버슈트 회전각 (도).
         /// 주먹이 힘차게 뻗어나가는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 90.")]
+        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 70~80.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _shotOvershoot = 90f;
+        [SerializeField] private float _shotOvershoot = 80f;
 
         // ──────────────────────────────────────────
         // Inspector — 봉인 후퇴
         // ──────────────────────────────────────────
 
-        /// <summary>
-        /// 플레이어 감지 레이어.
-        /// ★ OverlapBox 로 직접 감지 (OnTriggerEnter2D 오브젝트 불일치 문제).
-        /// </summary>
-        [Tooltip("플레이어 감지 레이어. Player 레이어 선택.")]
-        [SerializeField] private LayerMask _playerLayer;
+        // ★ 피격 판정은 Arm_R 의 TestBossArmHitbox 가 담당.
 
         [Header("── 봉인 시 후퇴 ──────────────────────")]
 
@@ -342,9 +337,6 @@ namespace KEY
                 .DOColor(_activeColor, 0.05f)
                 .SetEase(Ease.OutFlash);
 
-            // 히트박스 활성
-            if (_hitbox != null) _hitbox.enabled = true;
-
             // 수평 발사
             float targetX = _armOriginLocalPos.x + _shotDistance * _shotDirection;
             _moveTween?.Kill();
@@ -355,8 +347,6 @@ namespace KEY
                 .OnComplete(() => done = true);
 
             // 앞으로 회전 오버슈트
-            // 오른쪽 발사 → Z 양수 (반시계 방향 앞으로)
-            // 왼쪽 발사  → Z 음수 (시계 방향 앞으로)
             float shotZ = _armOriginLocalEuler.z + _shotOvershoot * _shotDirection;
             _rotateTween?.Kill();
             _rotateTween = _armTransform
@@ -365,16 +355,18 @@ namespace KEY
                     _shotDuration)
                 .SetEase(Ease.OutExpo);
 
+            Debug.Log("[TestBossPattern_PunchShot] Active — 수평 발사 시작");
+
+            // 발사 + hitboxDuration 동안 대기
+            // ★ 피격 판정은 Arm_R 의 TestBossArmHitbox 가 OnTriggerEnter2D 로 수신
             float elapsed = 0f;
-            while (!done && elapsed < _shotDuration + 0.1f)
+            float totalWait = _shotDuration + _hitboxDuration;
+            while (elapsed < totalWait)
             {
-                if (_isInterrupted) break;
+                if (_isInterrupted) yield break;
                 elapsed += Time.deltaTime;
                 yield return null;
             }
-
-            yield return new WaitForSeconds(_hitboxDuration);
-            if (_hitbox != null) _hitbox.enabled = false;
         }
 
         /// <summary>

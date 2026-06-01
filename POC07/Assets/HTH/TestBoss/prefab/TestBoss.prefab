@@ -154,6 +154,7 @@ GameObject:
   - component: {fileID: 6244242973770741121}
   - component: {fileID: 3030605437940184962}
   - component: {fileID: 2820081174954800102}
+  - component: {fileID: 5956664942354421595}
   m_Layer: 16
   m_Name: Arm_L
   m_TagString: Untagged
@@ -297,6 +298,23 @@ MonoBehaviour:
   _partType: 0
   _spriteRenderer: {fileID: 6244242973770741121}
   _executionRangeOverride: 0
+--- !u!114 &5956664942354421595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366158322292190033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dd46cef09262bc4c8598ca6fd76c8a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossArmHitbox
+  _pattern: {fileID: 9187158776398648181}
+  _damage: 15
+  _playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
 --- !u!1 &367935668262967058
 GameObject:
   m_ObjectHideFlags: 0
@@ -653,9 +671,6 @@ MonoBehaviour:
   _windupRotate: -90
   _windupRotateDuration: 0.4
   _shotOvershoot: 90
-  _playerLayer:
-    serializedVersion: 2
-    m_Bits: 1024
   _retreatSpeed: 5
   _retreatDuration: 0.4
   _warningColor: {r: 0.3, g: 0.6, b: 1, a: 1}
@@ -842,6 +857,7 @@ GameObject:
   - component: {fileID: 6019077079977006523}
   - component: {fileID: 4375300345589444403}
   - component: {fileID: 7621204146408985440}
+  - component: {fileID: 852882469077180011}
   m_Layer: 16
   m_Name: Arm_R
   m_TagString: Untagged
@@ -985,6 +1001,23 @@ MonoBehaviour:
   _partType: 1
   _spriteRenderer: {fileID: 6019077079977006523}
   _executionRangeOverride: 0
+--- !u!114 &852882469077180011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4689039438399731876}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dd46cef09262bc4c8598ca6fd76c8a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossArmHitbox
+  _pattern: {fileID: 6662513423083704301}
+  _damage: 15
+  _playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
 --- !u!1 &6186417252854346877
 GameObject:
   m_ObjectHideFlags: 0
@@ -1041,9 +1074,6 @@ MonoBehaviour:
   _slamDepth: 2.5
   _slamDuration: 0.2
   _hitboxDuration: 0.2
-  _playerLayer:
-    serializedVersion: 2
-    m_Bits: 1024
   _punchDamage: 15
   _windupRotate: -45
   _windupRotateDuration: 0.5

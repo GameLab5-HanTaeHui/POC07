@@ -305,6 +305,11 @@ namespace KEY
         {
             if (_knockbackForce <= 0f) yield break;
 
+            // ★ 이동 입력 차단 — PlayerMover.ApplyMovement()가 매 FixedUpdate
+            //   velocity.x 를 덮어쓰므로 차단하지 않으면 넉백이 즉시 무효화됨
+            InputManager.Instance?.BlockMove();
+            InputManager.Instance?.BlockDash();
+
             // 수평 방향 + 상방 혼합
             Vector2 horizontal = new Vector2(direction.x, 0f).normalized;
             Vector2 knockDir = Vector2.Lerp(horizontal, Vector2.up, _knockbackUpward).normalized;
@@ -327,6 +332,10 @@ namespace KEY
             }
 
             _rigid2D.linearVelocity = new Vector2(0f, _rigid2D.linearVelocity.y);
+
+            // ★ 이동 입력 해제
+            InputManager.Instance?.UnblockMove();
+            InputManager.Instance?.UnblockDash();
         }
 
         /// <summary>

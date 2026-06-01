@@ -130,14 +130,8 @@ namespace KEY
         [Range(0.05f, 1f)]
         [SerializeField] private float _hitboxDuration = 0.2f;
 
-        /// <summary>
-        /// 플레이어 감지 레이어.
-        /// ★ OnTriggerEnter2D 는 Collider 오브젝트(Arm_L)와
-        ///   스크립트 오브젝트(PunchDown) 가 달라 동작 안 함.
-        ///   Active 중 Physics2D.OverlapBox 로 직접 감지.
-        /// </summary>
-        [Tooltip("플레이어 감지 레이어. Player 레이어 선택.")]
-        [SerializeField] private LayerMask _playerLayer;
+        // ★ 피격 판정은 Arm_L 의 TestBossArmHitbox 가 담당.
+        //   (OnTriggerEnter2D 는 Collider 오브젝트에서만 수신)
 
         /// <summary>
         /// 내리찍기 데미지.
@@ -153,9 +147,9 @@ namespace KEY
         /// 양수 = 반시계 방향 (Arm_L 기준 뒤로 젖힘).
         /// 팔이 내리찍기 직전 크게 들어올리는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -35~-45.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = -35f;
+        [SerializeField] private float _windupRotate = -90f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -169,9 +163,9 @@ namespace KEY
         /// 0도로 복귀할 때 살짝 앞으로 더 회전하는 오버슈트.
         /// 망치처럼 세게 내려치는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 내리찍기 오버슈트 회전각 (도). 권장: 70~-80")]
+        [Tooltip("Active 내리찍기 오버슈트 회전각 (도). 권장: 90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _slamOvershoot = 80f;
+        [SerializeField] private float _slamOvershoot = 90f;
 
         [Header("── 색상 피드백 ──────────────────────")]
 
@@ -290,9 +284,7 @@ namespace KEY
         /// <summary>
         /// Active 단계.
         /// 팔 빠르게 아래로 내리찍기 + 앞으로 회전 오버슈트.
-        /// ★ 히트 감지: OnTriggerEnter2D 대신 Physics2D.OverlapBox 사용.
-        ///   이유: _hitbox(Arm_L)와 스크립트(PunchDown)가 다른 오브젝트
-        ///         → Unity 트리거 콜백이 PunchDown 에 전달 안 됨.
+        /// ★ 피격 판정: Arm_L 의 TestBossArmHitbox 가 OnTriggerEnter2D 수신.
         /// </summary>
         protected override IEnumerator OnActive()
         {
@@ -300,7 +292,7 @@ namespace KEY
 
             float targetY = _armOriginLocalPos.y - _slamDepth;
 
-            // 내리찍기 이동
+            // 내리찍기 이동 (OutExpo — 망치 내리치기)
             _moveTween?.Kill();
             bool moveDone = false;
             _moveTween = _armTransform
@@ -317,63 +309,16 @@ namespace KEY
                     _slamDuration)
                 .SetEase(Ease.OutExpo);
 
-            // 내리찍기 완료 대기
+            Debug.Log("[TestBossPattern_PunchDown] Active — 내리찍기 시작");
+
+            // 내리찍기 + hitboxDuration 동안 대기
+            // 피격 판정은 Arm_L 의 TestBossArmHitbox 가 담당
             float elapsed = 0f;
-            bool hasHit = false;
-            while (!moveDone && elapsed < _slamDuration + 0.1f)
+            float totalWait = _slamDuration + _hitboxDuration;
+            while (elapsed < totalWait)
             {
-                if (_isInterrupted) break;
-
-                // ★ OverlapBox 로 플레이어 직접 감지
-                if (!hasHit && _hitbox != null && _playerLayer.value != 0)
-                {
-                    Bounds b = _hitbox.bounds;
-                    var hits = Physics2D.OverlapBoxAll(b.center, b.size, 0f, _playerLayer);
-                    foreach (var col in hits)
-                    {
-                        if (col.TryGetComponent<IDamageable>(out var dmg))
-                        {
-                            var info = new DamageInfo(
-                                _armTransform.position,
-                                _punchDamage,
-                                Vector2.down,
-                                AttackType.Combo1);
-                            dmg.TakeDamage(info);
-                            hasHit = true;
-                            Debug.Log($"[TestBossPattern_PunchDown] 플레이어 피격: -{_punchDamage}");
-                        }
-                    }
-                }
-
+                if (_isInterrupted) yield break;
                 elapsed += Time.deltaTime;
-                yield return null;
-            }
-
-            // 히트박스 유지 시간 동안 추가 감지
-            float holdElapsed = 0f;
-            while (holdElapsed < _hitboxDuration)
-            {
-                if (_isInterrupted) break;
-                if (!hasHit && _hitbox != null && _playerLayer.value != 0)
-                {
-                    Bounds b = _hitbox.bounds;
-                    var hits = Physics2D.OverlapBoxAll(b.center, b.size, 0f, _playerLayer);
-                    foreach (var col in hits)
-                    {
-                        if (col.TryGetComponent<IDamageable>(out var dmg))
-                        {
-                            var info = new DamageInfo(
-                                _armTransform.position,
-                                _punchDamage,
-                                Vector2.down,
-                                AttackType.Combo1);
-                            dmg.TakeDamage(info);
-                            hasHit = true;
-                            Debug.Log($"[TestBossPattern_PunchDown] 플레이어 피격: -{_punchDamage}");
-                        }
-                    }
-                }
-                holdElapsed += Time.deltaTime;
                 yield return null;
             }
         }
