@@ -116,7 +116,7 @@ namespace KEY
         // ══════════════════════════════════════════════════════
         // 외부 API / Context Menu
         // ══════════════════════════════════════════════════════
-
+#if UNITY_EDITOR
         /// <summary>
         /// 그로기 강제 진입.
         /// Inspector Context Menu 또는 키 입력으로 호출.
@@ -161,4 +161,5 @@ namespace KEY
             _testBossCore?.ResetBoss();
         }
     }
+#endif
 }
