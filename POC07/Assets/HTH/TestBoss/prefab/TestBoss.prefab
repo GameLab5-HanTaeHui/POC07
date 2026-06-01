@@ -624,8 +624,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossShockwave
   _shockwaveRadius: 8
-  _shockwavePower: 200
-  _upwardBias: 0.4
+  _shockwavePower: 20
+  _upwardForce: 15
+  _blockDuration: 0.5
   _playerLayer:
     serializedVersion: 2
     m_Bits: 1024

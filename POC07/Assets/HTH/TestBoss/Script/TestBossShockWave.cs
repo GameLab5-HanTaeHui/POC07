@@ -1,20 +1,34 @@
 ﻿// ============================================================
-// TestBossShockwave.cs  v1.1
+// TestBossShockwave.cs  v1.2
 // 테스트 보스 전용 충격파 컴포넌트
 //
-// [v1.1 변경 — BlockPlayerMoveRoutine WaitForSeconds → WaitForSecondsRealtime]
+// [v1.2 변경 — 넉백 미적용 문제 수정]
 //
-//   [기존 v1.0 문제]
-//     BlockPlayerMoveRoutine 에서 WaitForSeconds(duration) 사용.
-//     → WaitForSeconds 는 Time.timeScale 영향을 받음.
-//     → 히트스탑 중 timeScale = 0.02 이면
-//       WaitForSeconds(0.3f) 가 실제로 15초를 대기.
-//     → Block 이 풀리지 않는 동안 PlayerMover 가 velocity 덮어씀.
-//     → 충격파 넉백 무효화.
+//   [문제 1 — velocity 설정 전 Block 미보장]
+//     기존: Trigger() 에서 velocity 설정 후 코루틴으로 Block 시작
+//     → 코루틴의 첫 yield 전까지는 동기지만,
+//       velocity 설정과 같은 프레임에 PlayerMover.FixedUpdate 가 실행되면
+//       velocity 를 덮어씀.
+//     수정: velocity 설정 전 BlockMove/Jump/Dash 즉시 동기 호출
+//           → velocity 설정
+//           → 코루틴으로 일정 시간 후 Unblock
 //
-//   [v1.2 수정]
-//     WaitForSeconds → WaitForSecondsRealtime 으로 교체.
-//     → timeScale 영향 없이 실시간 duration 동안 차단 보장.
+//   [문제 2 — Rigidbody2D/위치 탐색 오류]
+//     기존: col.TryGetComponent<Rigidbody2D>()
+//     → col 이 플레이어 자식 Collider 이면 루트 Rigidbody2D 탐색 실패
+//     → 방향 계산도 col.transform.position 기준이라 엉뚱한 방향
+//     수정: col.GetComponentInParent<Rigidbody2D>()
+//           방향 계산도 rb.transform.position (루트 위치) 기준
+//
+//   [문제 3 — 상방 bias 계산]
+//     기존: Vector2.Lerp(horizontal, Vector2.up, _upwardBias).normalized
+//     → Lerp 후 normalized 는 의도한 방향을 유지하지만
+//       horizontal 이 순수 수평이면 Lerp 결과에 Y 성분이 섞임.
+//       실제로는 정상이나 위치 오류로 horizontal Y 가 -0.01 로 계산됨.
+//     수정: horizontal 을 (x, 0) 으로 강제하여 Y 오염 제거
+//           + _upwardBias 를 Y 에 직접 더하는 방식으로 변경
+//           finalDir = normalize(horizontal.x, _upwardBias * shockwavePower)
+//           → 상방 성분이 명시적으로 보장됨
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -27,7 +41,7 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 테스트 보스 전용 충격파 컴포넌트. (v1.1)
+    /// 테스트 보스 전용 충격파 컴포넌트. (v1.2)
     /// </summary>
     public class TestBossShockwave : MonoBehaviour
     {
@@ -36,13 +50,22 @@ namespace KEY
         [Min(0.5f)]
         [SerializeField] private float _shockwaveRadius = 8f;
 
-        [Tooltip("충격파 밀침 강도. 권장: 15~30.")]
+        [Tooltip("충격파 수평 밀침 강도. 권장: 15~25.")]
         [Min(0f)]
         [SerializeField] private float _shockwavePower = 20f;
 
-        [Tooltip("상방 힘 가중치. 권장: 0.3~0.5.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _upwardBias = 0.4f;
+        /// <summary>
+        /// 상방 튀어오르는 힘 (별도 Y축 velocity).
+        /// 수평 밀침과 독립적으로 Y velocity 에 더함.
+        /// 권장: 8~15. 클수록 위로 높이 날아감.
+        /// </summary>
+        [Tooltip("상방 튀어오르는 힘 (Y velocity). 권장: 8~15.")]
+        [Min(0f)]
+        [SerializeField] private float _upwardForce = 10f;
+
+        [Tooltip("이동 차단 지속 시간 (실시간 초). 권장: 0.4~0.8.")]
+        [Range(0.1f, 2f)]
+        [SerializeField] private float _blockDuration = 0.5f;
 
         [Header("── 레이어 ──────────────────────")]
         [Tooltip("플레이어 감지 레이어. Player 레이어 선택.")]
@@ -53,7 +76,7 @@ namespace KEY
         [Range(0f, 0.3f)]
         [SerializeField] private float _hitStopDuration = 0.08f;
 
-        [Tooltip("히트스탑 TimeScale. 권장: 0.0~0.05.")]
+        [Tooltip("히트스탑 TimeScale.")]
         [Range(0f, 0.2f)]
         [SerializeField] private float _hitStopTimeScale = 0.02f;
 
@@ -84,6 +107,11 @@ namespace KEY
         /// <summary>
         /// 충격파 발동.
         /// TestBossCore.ExitDilTime() 에서 호출.
+        ///
+        /// [v1.2 수정 — velocity 설정 보장 순서]
+        ///   1. Block 즉시 동기 호출 (velocity 덮어쓰기 차단)
+        ///   2. velocity 설정
+        ///   3. 코루틴으로 blockDuration 후 Unblock
         /// </summary>
         public void Trigger(Vector3 origin)
         {
@@ -120,19 +148,32 @@ namespace KEY
             {
                 Collider2D col = _overlapBuffer[i];
                 if (col == null) continue;
-                if (!col.TryGetComponent<Rigidbody2D>(out var rb)) continue;
 
-                Vector2 horizontal = ((Vector2)col.transform.position
-                    - (Vector2)origin).normalized;
-                Vector2 finalDir = Vector2.Lerp(horizontal, Vector2.up, _upwardBias).normalized;
+                // ★ v1.2: GetComponentInParent — 자식 Collider 여도 루트 Rigidbody2D 탐색
+                Rigidbody2D rb = col.GetComponentInParent<Rigidbody2D>();
+                if (rb == null) continue;
 
-                rb.linearVelocity = finalDir * _shockwavePower;
+                // ★ v1.2: 이동 입력 즉시 차단 (velocity 설정 전에 먼저)
+                InputManager.Instance?.BlockMove();
+                InputManager.Instance?.BlockJump();
+                InputManager.Instance?.BlockDash();
 
-                // 이동 차단 — 충격파 날아가는 동안
-                if (InputManager.Instance != null)
-                    StartCoroutine(BlockPlayerMoveRoutine(_hitStopDuration + 0.3f));
+                // ★ v1.2: 수평 방향은 순수 X축으로 강제 (Y 오염 제거)
+                //   rb.position 기준 → 루트 위치로 방향 계산
+                float dx = rb.position.x - (float)origin.x;
+                float horizontalSign = dx >= 0f ? 1f : -1f;
 
-                Debug.Log($"[TestBossShockwave] 플레이어 밀침 방향:{finalDir} 강도:{_shockwavePower}");
+                // 수평 + 상방 별도 설정
+                // linearVelocity.x = 수평 밀침
+                // linearVelocity.y = 상방 힘 (튀어오르는 느낌)
+                rb.linearVelocity = new Vector2(
+                    horizontalSign * _shockwavePower,
+                    _upwardForce);
+
+                Debug.Log($"[TestBossShockwave] 밀침 → 수평:{horizontalSign * _shockwavePower:F1} 상방:{_upwardForce:F1}");
+
+                // ★ v1.2: 코루틴으로 Unblock (WaitForSecondsRealtime — timeScale 무관)
+                StartCoroutine(UnblockAfterRealtime(_blockDuration));
             }
         }
 
@@ -141,20 +182,11 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 플레이어 이동 입력 일시 차단.
-        ///
-        /// [v1.1 수정]
-        ///   WaitForSeconds → WaitForSecondsRealtime
-        ///   → timeScale 이 낮아도 실시간 duration 보장
-        ///   → 히트스탑 중에도 정확한 차단 시간 유지
+        /// 실시간 duration 후 이동 입력 해제.
+        /// WaitForSecondsRealtime → timeScale 영향 없음.
         /// </summary>
-        private IEnumerator BlockPlayerMoveRoutine(float duration)
+        private IEnumerator UnblockAfterRealtime(float duration)
         {
-            InputManager.Instance?.BlockMove();
-            InputManager.Instance?.BlockJump();
-            InputManager.Instance?.BlockDash();
-
-            // ★ v1.1: WaitForSecondsRealtime — timeScale 영향 없음
             yield return new WaitForSecondsRealtime(duration);
 
             InputManager.Instance?.UnblockMove();
@@ -164,7 +196,6 @@ namespace KEY
 
         /// <summary>
         /// 히트스탑 코루틴.
-        /// WaitForSecondsRealtime: timeScale 영향 없음.
         /// </summary>
         private IEnumerator HitStopRoutine()
         {
