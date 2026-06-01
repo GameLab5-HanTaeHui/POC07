@@ -1,6 +1,6 @@
 # Key_BOSSHierarchy — 보스 기사 오브젝트 배치도
 
-최신 버전 기준: v0.26 (핵심 컴포넌트 구현 완료)
+최신 버전 기준: v0.28 (Prefab 구성 완료 + 코드 수정)
 
 Unity 버전 6000.3.10f1 | 2D Universal | namespace : KEY
 
@@ -33,7 +33,7 @@ Unity 버전 6000.3.10f1 | 2D Universal | namespace : KEY
 ```
 Boss_Knight                              Layer: Enemy
 │
-├── [BossKnight]                         v1.0
+├── [BossKnight]                         v1.1
 │     (SO) BossKnightDataSO             * 보스 전용 수치 SO
 │     _phaseManager                     BossPhaseManager 참조
 │     _counterSystem                    BossCounterSystem 참조
@@ -52,7 +52,7 @@ Boss_Knight                              Layer: Enemy
 │     회피 기동 처리
 │     _allPatternsCooldown 체크 → 회피 기동 발동
 │
-├── [BossCounterSystem]                  v1.0
+├── [BossCounterSystem]                  v1.1
 │     _isCounterActive (bool)           반격 패턴 중복 방지 플래그
 │     검 무식 / 대타 출동 통합 관리
 │     봉인 투사체 감지 → 상태 판단 → 발동 결정
@@ -353,6 +353,8 @@ Recovery 단계
 | 필드 | 값 |
 |---|---|
 | `_interceptHands` | Hand2_L / Hand2_R의 BossPartComponent 목록 |
+| `_interceptHandSeals` | Hand2_L / Hand2_R의 SealComponent 목록 (v1.1 추가) |
+| `_interceptSealDuration` | 4.0초 (대타 출동 봉인 지속 시간) |
 | `_parryEffect` | 검 무식 ParticleSystem |
 | `_rearDetectThreshold` | -0.2 (후방 판단 dot product 임계값) |
 | `_rearTurnDelay` | 0.2초 (후방 감지 시 회전 딜레이) |
@@ -458,3 +460,61 @@ playerLayer                  (Player)
 | **BossRange** | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
 
 BossRange 레이어는 시각화 전용. 모든 충돌 OFF.
+
+
+
+---
+
+## Prefab 실제 구성 확인 (v0.28 파싱 결과)
+
+### 확인된 오브젝트 목록
+
+| 오브젝트 | Layer | 컴포넌트 |
+|---|---|---|
+| BossKnight (루트) | 15 Enemy | BossKnight v1.1, BossPhaseManager, BossKnightAI, BossCounterSystem v1.1, BossShockwave, BossExecutionHandler, BossCoreLock, SealComponent, ObjectFlipController, 패턴 12개 |
+| Phase1 | 0 | Transform 빈 그룹 |
+| Phase2 | 0 | Transform 빈 그룹 |
+| Phase3 | 0 | Transform 빈 그룹 |
+| AllType | 0 | Transform 빈 그룹 |
+| Shield_Phase1 | 18 EnemyShield | BossPartComponent(_partType=Shield, _activePhases=[Phase1]) |
+| Sword_Phase2 | 0 | BossPartComponent(_partType=Sword, _activePhases=[Phase2]) |
+| Sword_L_Phase3 | 0 | BossPartComponent(_partType=SwordL, _activePhases=[Phase3]) |
+| Sword_R_Phase3 | 0 | BossPartComponent(_partType=SwordR, _activePhases=[Phase3]) |
+| Hand2_L_Phase3 | 0 | BossPartComponent(_partType=Hand2L), SealComponent |
+| Hand2_R_Phase3 | 0 | BossPartComponent(_partType=Hand2R), SealComponent |
+| Arm_L | 0 | BossPartComponent(_partType=ArmL, _activePhases=[Phase1,2,3], affectedPatterns=7개) |
+| Arm_R | 0 | BossPartComponent(_partType=ArmR, _activePhases=[Phase1,2,3], affectedPatterns=3개) |
+| Core | 0 | BossPartComponent(_partType=Core, _activePhases=[Phase2,3]), BossCoreLock |
+| HitBox_ShieldCharge | 16 EnemyAttackHit | BoxCollider2D |
+| HitBox_ShieldSlam | 16 EnemyAttackHit | BoxCollider2D |
+| HitBox_PunchR | 16 EnemyAttackHit | BoxCollider2D |
+| HitBox_Sword | 16 EnemyAttackHit | BoxCollider2D |
+| HitBox_Hand2L | 16 EnemyAttackHit | BoxCollider2D |
+| HitBox_Hand2R | 16 EnemyAttackHit | BoxCollider2D |
+| RangeIndicator_ShieldCharge | 20 BossRange | BossRangeIndicator(Line) |
+| RangeIndicator_Punch | 20 BossRange | BossRangeIndicator(Line) |
+| RangeIndicator_SwordSlash | 20 BossRange | BossRangeIndicator(Line) |
+| RangeIndicator_Advance | 20 BossRange | BossRangeIndicator(Line) |
+| RangeIndicator_DonutSlash | 20 BossRange | BossRangeIndicator(Donut) |
+| RangeIndicator_Slash1 | 20 BossRange | BossRangeIndicator(Line) |
+| SealOverlay | 19 BossRange | SpriteRenderer |
+| HitBox | 0 | Transform 빈 그룹 |
+| Range | 0 | Transform 빈 그룹 |
+| public | 0 | Transform 빈 그룹 |
+
+### 수정된 항목 (v0.28)
+
+```
+[수정됨]
+  BossPattern_Slash4/0/1 → SwordSlash4/0/1 재연결
+  Core._activePhases: Phase1 제거 (Phase2, Phase3만)
+  SwordSlash7/12/4/0/1 _isSwordPattern = true
+  Core 오브젝트의 중복 BossCoreLock 제거
+  Hand2_L / Hand2_R에 SealComponent 추가
+  BossCounterSystem._interceptHandSeals 연결
+  ObjectFlipController._invertList = [false, false, false]
+
+[확인됨]
+  _settings (EnemyDataSO) = null (비워두면 됨)
+  _bossData (BossKnightDataSO) = BossKnightData.asset 연결됨
+```

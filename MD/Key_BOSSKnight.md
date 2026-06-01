@@ -822,14 +822,30 @@ Phase 3
 | `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO. Phase별 struct 분리 |
 | `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery + Pause/Resume/Interrupt |
 | `BossKnightAI.cs` | v1.0 | 보스 전용 AI. 10상태 + 회피기동 + Counter |
-| `BossKnight.cs` | v1.0 | 보스 루트. Phase전환 + 무적 + TakeDamage override |
+| `BossKnight.cs` | v1.1 | 보스 루트. base.Awake() 우회. HpRatio override. _settings null 허용 |
 | `BossPhaseManager.cs` | v1.0 | HP 임계값 감시 + Phase 전환 실행 |
-| `BossPartComponent.cs` | v1.0 | 부위별 봉인 상태 + 패턴 속도 배율 (_speedMultiplier) |
+| `BossPartComponent.cs` | v1.1 | 부위별 봉인 상태 + 패턴 속도 배율. HitFeedback 연동 |
 | `BossCoreLock.cs` | v1.0 | 코어 활성 조건 + 딜타임 관리 |
-| `BossCounterSystem.cs` | v1.0 | 검 무식/대타 출동 통합. _isCounterActive |
+| `BossCounterSystem.cs` | v1.1 | 검 무식/대타 출동. 대타 봉인 SealComponent.ApplySealByType 연동 |
 | `BossShockwave.cs` | v1.0 | 충격파 전용. 데미지 없음 밀침만 |
 | `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형. 자동 이동 + 강제 중단 |
 | `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화. Inspector on/off |
+
+### v0.28 코드 수정 내역
+
+| 파일 | 버전 | 변경 내용 |
+|---|---|---|
+| `BossKnight.cs` | v1.1 | `base.Awake()` 제거. `_settings` null 허용. `HpRatio` override 추가. `_settings(EnemyDataSO)` 는 Inspector에서 비워두면 됨 |
+| `BossCounterSystem.cs` | v1.1 | 대타 출동 주먹 봉인 수정. `ForceUnlock()` → `SealComponent.ApplySealByType(SealType.Dash, duration)`. `_interceptHandSeals` 필드 추가 |
+| `BossPartComponent.cs` | v1.1 | `_partSpriteRenderer` 자동 취득. 자물쇠 해제 시 `HitFeedback.LockUnlocked()`, 재잠금 시 `HitFeedback.SealApplied()` 호출 |
+
+**핵심 수정: BossKnight._settings 슬롯**
+```
+EnemyBase를 상속하면 Inspector에 _settings(EnemyDataSO) 슬롯이 나타남
+→ BossKnight는 EnemyDataSO 대신 BossKnightDataSO를 사용
+→ _settings는 null로 비워두면 됨
+→ base.Awake()가 null 체크로 비활성화하는 문제를 우회 처리
+```
 
 ### 완료된 패턴 구현체 (v0.27)
 
@@ -862,11 +878,11 @@ Phase 3
 | 대타 출동 주먹 봉인 | ✅ 확정 | 봉인 적용 + 해당 패턴 시전 불가 |
 | BossPatternBase 추상 베이스 | ✅ 완료 | v1.0. Warning/Active/Recovery 3단계 |
 | BossKnightAI 보스 전용 AI | ✅ 완료 | v1.0. 10상태 + 회피기동 + Counter |
-| BossKnight 루트 컴포넌트 | ✅ 완료 | v1.0. Phase전환 + 무적 + TakeDamage |
+| BossKnight 루트 컴포넌트 | ✅ 완료 | v1.1. base.Awake() 우회. HpRatio override |
 | BossPhaseManager | ✅ 완료 | v1.0. HP 임계값 감시 |
-| BossPartComponent | ✅ 완료 | v1.0. 부위별 봉인 + 패턴 속도 배율 |
+| BossPartComponent | ✅ 완료 | v1.1. HitFeedback 연동. _partSpriteRenderer 자동 취득 |
 | BossCoreLock | ✅ 완료 | v1.0. 코어 활성 조건 + 딜타임 |
-| BossCounterSystem | ✅ 완료 | v1.0. 검 무식/대타 출동 통합 |
+| BossCounterSystem | ✅ 완료 | v1.1. SealComponent.ApplySealByType 연동 |
 | BossShockwave | ✅ 완료 | v1.0. 밀침 전용 |
 | BossExecutionHandler | ✅ 완료 | v1.0. A키 홀드 처형 |
 | BossRangeIndicator | ✅ 완료 | v1.0. Inspector on/off |
@@ -875,8 +891,11 @@ Phase 3
 | Phase 2 패턴 구현체 4개 | ✅ 완료 | v0.27 |
 | Phase 3 패턴 구현체 5개 | ✅ 완료 | v0.27 SwordSlash4/0/1 명칭 적용 |
 | BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
-| LockComponent ForceUnlock() 패치 | 🔲 패치 필요 | LockComponent_patch.txt |
-| InputManager IsAttackHeld 패치 | 🔲 패치 필요 | InputManager_IsAttackHeld_patch.txt |
+| LockComponent ForceUnlock() 패치 | ✅ 완료 | v0.28 |
+| InputManager IsAttackHeld 패치 | ✅ 완료 | v0.28 |
+| SealComponent ApplySealByType() 패치 | 🔲 패치 필요 | SealComponent_patch.txt |
 | 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
 | Boss_Knight Prefab 구성 가이드 | ✅ 완료 | v0.27 Boss_Knight_Prefab_Guide.md |
+| Boss_Knight Prefab 에디터 구성 | ✅ 완료 | v0.28 7개 버그 수정 완료 |
+| 보스 Animator Controller | 🔲 미착수 | 보스 전용 Controller 제작 필요 |
 | 보스 룸 씬 구성 | 🔲 미착수 | |

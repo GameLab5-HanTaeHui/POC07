@@ -326,6 +326,15 @@ namespace KEY
         /// HP 변화 후 Phase 전환 조건 체크.
         /// EnemyBase.TakeDamage() 에서 OnDamaged() 호출.
         /// </summary>
+        /// <summary>
+        /// HP 비율. EnemyBase.MaxHp 는 _settings 기반이라 null 시 1f 반환.
+        /// BossKnight 는 _bossData.maxHp 기반으로 override.
+        /// </summary>
+        public override float HpRatio
+            => _bossData != null && _bossData.maxHp > 0f
+                ? _currentHp / _bossData.maxHp
+                : 0f;
+
         protected override void OnDamaged(DamageInfo info)
         {
             _phaseManager.CheckPhaseTransition(HpRatio);

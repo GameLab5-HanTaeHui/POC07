@@ -377,6 +377,15 @@ protected override bool IsReadyToFire => _sealData != null;
 | WeaponHUD Prefab 세팅 | 🔲 미착수 | Canvas > WeaponHUD > SlotContainer 구성 |
 | AimLine 오브젝트 생성 | 🔲 미착수 | Player 자식 + ChargeAimLine + LineRenderer |
 | ChargeProjectile Prefab 생성 | 🔲 미착수 | Rigidbody2D GravityScale=0 / CircleCollider2D isTrigger=ON |
+| **[보스] LockComponent ForceUnlock() 패치** | ✅ 완료 | v0.28 |
+| **[보스] InputManager IsAttackHeld 패치** | ✅ 완료 | v0.28 |
+| **[보스] BossKnightData.asset 생성** | ✅ 완료 | v0.28 |
+| **[보스] Boss_Knight Prefab 에디터 구성** | ✅ 완료 | v0.28 7개 버그 수정 완료 |
+| **[보스] SealComponent ApplySealByType() 패치** | 🔲 패치 필요 | SealComponent_patch.txt 참고 |
+| **[보스] BossKnightDataSO 수치 밸런싱** | 🔲 미착수 | |
+| **[보스] 보스 Animator Controller** | 🔲 미착수 | 보스 전용 Animator Controller 필요 |
+| **[보스] 보스 스프라이트 / 애니메이션** | 🔲 미착수 | |
+| **[보스] 보스 룸 씬 구성** | 🔲 미착수 | |
 
 ---
 
@@ -1431,7 +1440,7 @@ Z축 강도 = 0 강제 (2D 사이드뷰 전후 이동 방지)
 Combo3 → Heavy / AirDown → Medium
 ```
 
-**파일 버전 스냅샷 (v0.26 기준 — 실제 프로젝트 최신)**
+**파일 버전 스냅샷 (v0.28 기준 — 실제 프로젝트 최신)**
 
 | 파일 | 버전 | 비고 |
 |---|---|---|
@@ -1465,14 +1474,38 @@ Combo3 → Heavy / AirDown → Medium
 | `HitFeedback.cs` | v2.0 | |
 | ~~`AirAttackDirection.cs`~~ | — | 프로젝트에서 `PlayerAirAttackDirection.cs` 로 명칭 적용 |
 | `BossPhase.cs` | v1.0 | BossPhase/BossPartType/BossPatternSealResult enum |
+| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO. Phase별 struct 분리 |
+| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery 3단계 |
+| `BossKnightAI.cs` | v1.0 | 보스 전용 AI. 10상태 + 회피기동 + Counter |
+| `BossKnight.cs` | v1.1 | 보스 루트. base.Awake() 우회. HpRatio override |
+| `BossPhaseManager.cs` | v1.0 | Phase 전환 관리 |
+| `BossPartComponent.cs` | v1.1 | 부위별 봉인 상태. HitFeedback 연동 |
+| `BossCoreLock.cs` | v1.0 | 코어 활성/딜타임 |
+| `BossCounterSystem.cs` | v1.1 | 검 무식/대타 출동. SealComponent.ApplySealByType 연동 |
+| `BossShockwave.cs` | v1.0 | 충격파 |
+| `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형 |
+| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화 |
+| `BossPattern_ShieldCharge.cs` | v1.0 | Phase 1 방패 돌진 |
+| `BossPattern_DefenseStance.cs` | v1.0 | Phase 1 방어 자세 |
+| `BossPattern_PunchR.cs` | v1.0 | Phase 1 주먹 공격 |
+| `BossPattern_Advance.cs` | v1.0 | Phase 2 전방 진군 |
+| `BossPattern_Charge.cs` | v1.0 | Phase 2 전방 돌격 |
+| `BossPattern_SwordSlash7.cs` | v1.0 | Phase 2 검 제식 7 |
+| `BossPattern_SwordSlash12.cs` | v1.0 | Phase 2 검 제식 12 |
+| `BossPattern_SwordSlash4.cs` | v1.0 | Phase 3 검 제식 4 |
+| `BossPattern_SwordSlash0.cs` | v1.0 | Phase 3 검 제식 0 |
+| `BossPattern_SwordSlash1.cs` | v1.0 | Phase 3 검 제식 1 |
+| `BossPattern_PunchDash.cs` | v1.0 | Phase 3 주먹 돌진 |
+| `BossPattern_Grab.cs` | v1.0 | Phase 3 횡 잡기 |
+| `BossPhase.cs` | v1.0 | BossPhase/BossPartType/BossPatternSealResult enum |
 | `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO |
 | `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스 |
 | `BossKnightAI.cs` | v1.0 | 보스 전용 AI |
-| `BossKnight.cs` | v1.0 | 보스 루트 |
+| `BossKnight.cs` | v1.1 | 보스 루트. base.Awake() 우회. HpRatio override |
 | `BossPhaseManager.cs` | v1.0 | Phase 전환 관리 |
-| `BossPartComponent.cs` | v1.0 | 부위별 봉인 상태 |
+| `BossPartComponent.cs` | v1.1 | 부위별 봉인 상태. HitFeedback 연동 |
 | `BossCoreLock.cs` | v1.0 | 코어 활성/딜타임 |
-| `BossCounterSystem.cs` | v1.0 | 검 무식/대타 출동 |
+| `BossCounterSystem.cs` | v1.1 | 검 무식/대타 출동. 대타 봉인 SealComponent 연동 |
 | `BossShockwave.cs` | v1.0 | 충격파 |
 | `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형 |
 | `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화 |
@@ -1689,3 +1722,84 @@ BossPatternBase vs EnemyAttackBase 차이
 | `BossPattern_SwordSlash1.cs` | v1.0 |
 | `BossPattern_PunchDash.cs` | v1.0 |
 | `BossPattern_Grab.cs` | v1.0 |
+
+---
+
+### v0.28 — Boss_Knight Prefab 구성 완료 + 코드 수정
+
+**작업 내용**
+Boss_Knight.prefab 에디터 구성 완료 및 발견된 버그 수정.
+
+**Prefab 파싱 분석으로 발견된 문제 7가지 전부 수정 완료**
+
+| 번호 | 문제 | 수정 내용 | 상태 |
+|---|---|---|---|
+| 1 | BossPattern_Slash4/0/1 → SwordSlash4/0/1 클래스명 불일치 | Prefab에서 패턴 컴포넌트 재연결 | ✅ |
+| 2 | Core._activePhases Phase1 포함 오류 | Phase1 제거 → Phase2, Phase3만 활성 | ✅ |
+| 3 | 검 패턴 5개 _isSwordPattern = false | SwordSlash7/12/4/0/1 전부 true 로 변경 | ✅ |
+| 4 | Core 오브젝트에 BossCoreLock 중복 | Core 오브젝트의 BossCoreLock 제거 | ✅ |
+| 5 | Hand2_L / Hand2_R에 SealComponent 없음 | SealComponent 추가 + BossCounterSystem 연결 | ✅ |
+| 6 | BossCounterSystem._interceptHandSeals 미연결 | Hand2_L / Hand2_R SealComponent 연결 | ✅ |
+| 7 | ObjectFlipController._invertList 비어있음 | [false, false, false] 설정 | ✅ |
+
+**코드 수정 파일**
+
+| 파일 | 버전 | 변경 내용 |
+|---|---|---|
+| `BossKnight.cs` | v1.1 | base.Awake() 우회. EnemyBase._settings null 허용. HpRatio override 추가 |
+| `BossCounterSystem.cs` | v1.1 | 대타 출동 주먹 봉인 로직 수정. ForceUnlock → SealComponent.ApplySealByType |
+| `BossPartComponent.cs` | v1.1 | _partSpriteRenderer 자동 취득. HitFeedback.LockUnlocked / SealApplied 연동 |
+
+**SealComponent v1.4 패치 필요**
+```
+ApplySealByType(SealType type, float duration) 메서드 추가
+BossCounterSystem 대타 출동에서 주먹 봉인 시 호출
+참고: SealComponent_patch.txt
+```
+
+**BossKnight.cs v1.1 핵심 수정**
+```
+문제: EnemyBase.Awake() → _settings == null → enabled = false
+원인: BossKnight는 EnemyDataSO(_settings) 대신
+      BossKnightDataSO(_bossData)를 사용
+해결: base.Awake() 호출 제거
+      → Rigidbody2D / SpriteRenderer 직접 취득
+      → _settings는 영구 null 유지
+      → _currentHp = _bossData.maxHp 직접 초기화
+      → HpRatio 프로퍼티 override (_bossData.maxHp 기반)
+
+Inspector에서 _settings(EnemyDataSO)는 연결 불필요 — 비워두면 됨
+```
+
+**Prefab 최종 확인 상태 (v0.28)**
+
+```
+BossKnight 루트               Layer: 15(Enemy)
+  _bossData = BossKnightData.asset ✅
+  _allParts = 9개 ✅
+  _phase1Patterns = 3개 ✅
+  _phase2Patterns = 4개 ✅
+  _phase3Patterns = 5개 ✅
+  _phase1Objects = [Shield_Phase1] ✅
+  _phase2Objects = [Sword_Phase2] ✅
+  _phase3Objects = [Sword_L, Sword_R, Hand2_L, Hand2_R] ✅
+
+BossCoreLock (루트)
+  _coreObject = Core ✅
+  _coreLockComponent = Lock_Core ✅
+  _coreCollider = Core BoxCollider2D ✅
+
+BossCounterSystem
+  _interceptHands = [Hand2_L, Hand2_R BossPartComponent] ✅
+  _interceptHandSeals = [Hand2_L, Hand2_R SealComponent] ✅
+
+Core BossPartComponent
+  _activePhases = [Phase2, Phase3] ✅ (Phase1 제거됨)
+
+검 패턴 _isSwordPattern = true ✅
+  SwordSlash7 / SwordSlash12 / SwordSlash4 / SwordSlash0 / SwordSlash1
+
+ObjectFlipController
+  _flipTargets = [Shield_Phase1, Arm_L, Arm_R] ✅
+  _invertList = [false, false, false] ✅
+```
