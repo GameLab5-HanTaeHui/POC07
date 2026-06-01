@@ -16,8 +16,8 @@ Lock → Unlock → Re-Lock → Break → Expose → Execute
 
 일반 기사(EnemyKnight)와의 차별점:
 - 자물쇠가 부위별로 분리되어 있고 각각 독립적으로 작동
-- 자물쇠 해제가 단순 약점 노출이 아니라 패턴 변화를 유발
-- 해제된 부위는 A키 홀드 처형으로 재잠금 가능
+- 자물쇠 상태가 단순 약점 노출이 아니라 패턴 변화를 유발
+- 부위는 A키 홀드 처형으로 잠금/해제 가능
 - 3페이즈 구조로 단계마다 전투 방식이 완전히 달라짐
 - 검 무식 / 대타 출동 반격 시스템 존재
 
@@ -105,7 +105,7 @@ Phase 전환 시
 
 [처형 진행]
   플레이어 → 해당 부위 위치로 자동 이동
-  홀드 시간 채움 → 잠금 / 해제 실행
+  이동 완료 → 잠금 / 해제 실행
 
 [그로기 회복 시 강제 중단]
   처형 동작 즉시 끊김
@@ -210,38 +210,89 @@ true 상태에서 새 봉인 투사체 감지 → 전부 무시
 
 ## Phase 1 — 봉인된 기사
 
+### 핵심 컨셉
+
+```
+보스가 스스로 자물쇠를 해제하려 시도한다.
+플레이어는 이를 막고 양팔을 잠금 상태로 유지해야 한다.
+
+양팔 잠금 유지 → 코어 활성 → A키 홀드 처형 → 딜타임 진입
+딜타임 종료 → 보스가 양팔 자물쇠를 스스로 풀어버림
+→ 플레이어가 다시 양팔을 재잠금해야 코어 재활성
+→ 반복하여 HP 50% 도달 → Phase 2 진입
+```
+
 ### 기본 설정
 
 ```
 HP 범위       : 100% ~ 50%
-이동 속도     : 느림 (다수 봉인 상태)
-기본 상태     : 방패, 왼팔, 오른팔 전부 봉인
-전방 공격     : 방패로 인해 전방 완전 차단 (봉인 상태 무관)
+이동 속도     : 느림
+기본 상태     : 방패, 왼팔, 오른팔 전부 잠금
+전방 공격     : 방패로 인해 전방 완전 차단 (잠금 상태 무관)
+HP 감소 조건  : 딜타임 중 코어 직접 공격만 허용
+               팔/방패 해제 여부와 관계없이 직접 피격 불가
 ```
 
 ### 자물쇠 구조
 
 ```
 방패 자물쇠 (ShieldLock)
-  위치: 방패 부위
-  해제 전: 방패 돌진 불가 (방어 자세 + 밀치기만 가능)
-  해제 후: 방패 돌진 패턴 활성화
-           전방 공격 무효 유지
-  재잠금: A키 홀드 처형으로 재봉인 가능
+  위치       : 방패 부위
+  초기 상태  : 잠금
+  잠금 상태  : 방패 돌진 불가 (방어 자세 + 밀치기만 가능)
+  해제 상태  : 방패 돌진 패턴 활성화 / 전방 공격 무효 유지
+  색상 피드백: 잠금 = 파란색 / 해제 = 붉은색
+  처형       : A키 홀드 → 재잠금 가능
 
 왼팔 자물쇠 (ArmLLock)
-  위치: 왼팔 부위
-  해제 전: 왼팔 봉인 상태 — 방패 패턴 속도/시전 느림
-  해제 후: 약점 부위 노출 (직접 공격 가능)
-           방패 패턴 시전 시간 단축 + 속도 증가 (위험 증가)
-  재잠금: A키 홀드 처형으로 재봉인 가능
+  위치       : 왼팔 부위
+  초기 상태  : 잠금
+  잠금 상태  : 방패 패턴 속도 느림 + 코어 활성 조건 충족
+  해제 상태  : 방패 패턴 속도 정상 + 코어 활성 조건 실패
+  색상 피드백: 잠금 = 파란색 / 해제 = 붉은색
+  처형       : A키 홀드 → 재잠금 (코어 조건 복구)
+  약점 노출  : 없음 — 해제되어도 직접 피격 불가
 
 오른팔 자물쇠 (ArmRLock)
-  위치: 오른팔 부위
-  해제 전: 오른팔 봉인 상태 — 주먹 공격 속도/시전 느림
-  해제 후: 약점 부위 노출 (직접 공격 가능)
-           주먹 공격 시전 시간 단축 + 속도 증가 (위험 증가)
-  재잠금: A키 홀드 처형으로 재봉인 가능
+  위치       : 오른팔 부위
+  초기 상태  : 잠금
+  잠금 상태  : 주먹 패턴 속도 느림 + 코어 활성 조건 충족
+  해제 상태  : 주먹 패턴 속도 정상 + 코어 활성 조건 실패
+  색상 피드백: 잠금 = 파란색 / 해제 = 붉은색
+  처형       : A키 홀드 → 재잠금 (코어 조건 복구)
+  약점 노출  : 없음 — 해제되어도 직접 피격 불가
+
+코어 자물쇠 (CoreLock)
+  위치       : 가슴 중앙
+  초기 상태  : 비활성 (숨겨진 상태)
+  활성 조건  : 왼팔(잠금) AND 오른팔(잠금) 동시 충족
+  비활성 조건: 왼팔 OR 오른팔 해제 → 즉시 비활성
+  활성 후    : A키 홀드 처형 → 딜타임 진입
+```
+
+### 코어 딜타임 구조
+
+```
+[진입 조건]
+  왼팔 잠금 + 오른팔 잠금 → 코어 활성
+  → A키 홀드 처형으로 코어 해제 → 딜타임 진입
+
+[딜타임 중]
+  보스 완전 정지
+  코어에 직접 공격 → HP 감소
+  검 무식 / 대타 출동 발동 불가
+  지속시간: DataSO 수정 가능 (기본 7초)
+
+[딜타임 종료]
+  1. 자동 코어 봉인 (비활성)
+  2. 왼팔 자물쇠 강제 해제 (보스 탈출)
+  3. 오른팔 자물쇠 강제 해제 (보스 탈출)
+  4. 충격파 발생 (데미지 없음, 플레이어 밀침)
+  5. 전투 상태 복귀
+
+[플레이어 목표]
+  딜타임 종료 후 그로기를 유발해
+  양팔을 다시 재잠금 → 코어 재활성 → 딜타임 반복
 ```
 
 ### 패턴 목록
@@ -250,12 +301,8 @@ HP 범위       : 100% ~ 50%
 
 ```
 [발동 조건]
-  방패 자물쇠 해제 상태에서만 발동 가능
+  방패 자물쇠 해제 상태에서만 발동
   쿨타임: DataSO 수정 가능
-
-[시전 대기]
-  방패 자물쇠 해제 확인
-  플레이어 방향 조준
 
 [예고] 1.5초
   방패를 앞으로 치켜 올리는 모션
@@ -276,11 +323,8 @@ HP 범위       : 100% ~ 50%
 
 ```
 [발동 조건]
-  항상 발동 가능 (조건 없음)
+  항상 발동 가능
   쿨타임: DataSO 수정 가능
-
-[시전 대기]
-  플레이어 방향 확인
 
 [예고] 0.5초
   방패를 정면에 세우는 모션
@@ -288,11 +332,11 @@ HP 범위       : 100% ~ 50%
 
 [시전 중] 2.0~4.0초 (DataSO 수정)
   전방 피해 완전 차단
+  방어 중 보스가 팔 자물쇠를 스스로 해제하려 시도
   봉인 가능 구간 (Guard SealType)
   → Guard 봉인 성공 시
-     방어 자세 강제 해제
-     짧은 경직 발생
-     플레이어 공격 기회
+     방어 자세 강제 해제 + 그로기 진입
+     플레이어가 팔 A키 홀드 처형으로 재잠금 가능
 
 [후딜레이] 0.5초
   자세 해제 모션
@@ -303,15 +347,12 @@ HP 범위       : 100% ~ 50%
 ```
 [발동 조건]
   오른팔 자물쇠 해제 상태에서만 발동
-  오른팔 봉인 중 → 속도/시전 시간 감소 적용
-
-[시전 대기]
-  오른팔 해제 확인
-  플레이어 위치 조준
+  (오른팔이 해제됐다 = 플레이어가 처형을 아직 못 한 위험 상태)
+  쿨타임: DataSO 수정 가능
 
 [예고]
-  오른팔 봉인 상태:   1.2초
-  오른팔 해제 상태:   0.7초 (단축)
+  왼팔 잠금 상태: 1.2초 (느림)
+  왼팔 해제 상태: 0.7초 (단축, 더 위험)
   오른팔을 높이 드는 모션
   지면 타격 예상 범위 표시 (원형)
   봉인 불가 구간
@@ -322,27 +363,44 @@ HP 범위       : 100% ~ 50%
   봉인 불가
 
 [후딜레이]
-  오른팔 봉인 상태: 0.8초
-  오른팔 해제 상태: 0.4초 (단축)
-  플레이어 공격 가능 구간
+  왼팔 잠금 상태: 0.8초
+  왼팔 해제 상태: 0.4초 (단축)
+  플레이어 처형 기회 구간
+```
+
+### 색상 피드백
+
+```
+자물쇠 잠금 상태 (IsLocked)  : 파란색
+자물쇠 해제 상태 (IsUnlocked): 붉은색
+코어 활성 상태               : 노란색 이펙트 + 시각 표시
+딜타임 중                    : 코어 강조 표시
 ```
 
 ### 플레이어 공격 가능 구조
 
 ```
-기본 구조
-  봉인된 부위는 피해 무시
-  그로기 상태 / 후딜레이 구간에서 공격 가능
+[일반 공격]
+  패턴 후딜레이 구간 → 직접 공격 가능 (HP 감소 없음)
+  딜타임 중 코어 → HP 감소
 
-자물쇠 해제 후
-  해당 부위 약점 노출 → 직접 피해 가능
-  단 해제할수록 패턴 위험도 증가
+[처형 (A키 홀드)]
+  그로기 + 부위 범위 내 + A키 홀드
+  → 팔 재잠금 (코어 조건 복구)
+  → 방패 재잠금 (방패 돌진 차단)
+  → 코어 해제 (딜타임 진입)
 
-재잠금 (A키 홀드 처형)
-  그로기 상태에서 해당 부위 범위 내
-  A키 홀드 → 자동 이동 → 재봉인 실행
-  재봉인 시 패턴 속도/시전 시간 원래대로 복귀
-  그로기 회복 시 처형 강제 중단 + 충격파
+[처형 강제 중단]
+  그로기 회복 시 → 처형 즉시 중단 + 충격파
+
+[Phase 1 핵심 루프]
+  방어 자세 Guard 봉인 → 그로기 유발
+  → 양팔 재잠금 (A키 홀드 처형)
+  → 코어 활성화
+  → 코어 처형 → 딜타임
+  → 7초간 HP 감소
+  → 딜타임 종료 → 충격파 + 양팔 해제
+  → 반복
 ```
 
 ---
@@ -389,8 +447,7 @@ HP 범위       : 50% ~ 0%
 
 ```
 [진입 조건]
-  그로기 상태에서 왼팔 + 오른팔 동시 봉인
-  → 코어 자물쇠 활성화 (시각적 표시)
+  왼팔 + 오른팔 동시 봉인 → 코어 자물쇠 활성화
   → A키 홀드 처형 → 딜타임 진입
 
 [딜타임 중]
@@ -784,6 +841,7 @@ Phase 1
   주먹 공격 쿨타임
   A키 홀드 처형 시간
   회피 기동 쿨타임
+  딜타임 지속시간
 
 Phase 2
   전방 진군 쿨타임
@@ -814,53 +872,31 @@ Phase 3
 
 ## 컴포넌트 구현 현황
 
-### 완료된 컴포넌트 (v0.26)
-
 | 컴포넌트 | 버전 | 역할 |
 |---|---|---|
-| `BossPhase.cs` | v1.0 | 열거형 모음 (BossPhase / BossPartType / BossPatternSealResult) |
-| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO. Phase별 struct 분리 |
-| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery + Pause/Resume/Interrupt |
+| `BossPhase.cs` | v1.0 | 열거형 모음 |
+| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO |
+| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery 3단계 |
 | `BossKnightAI.cs` | v1.0 | 보스 전용 AI. 10상태 + 회피기동 + Counter |
-| `BossKnight.cs` | v1.1 | 보스 루트. base.Awake() 우회. HpRatio override. _settings null 허용 |
+| `BossKnight.cs` | v1.2 | 보스 루트. EnemyBossBase 상속. TakeDamage 딜타임 전용 |
+| `EnemyBossBase.cs` | v1.0 | 보스 전용 베이스. EnemyBase 대체 |
 | `BossPhaseManager.cs` | v1.0 | HP 임계값 감시 + Phase 전환 실행 |
-| `BossPartComponent.cs` | v1.1 | 부위별 봉인 상태 + 패턴 속도 배율. HitFeedback 연동 |
-| `BossCoreLock.cs` | v1.0 | 코어 활성 조건 + 딜타임 관리 |
-| `BossCounterSystem.cs` | v1.1 | 검 무식/대타 출동. 대타 봉인 SealComponent.ApplySealByType 연동 |
-| `BossShockwave.cs` | v1.0 | 충격파 전용. 데미지 없음 밀침만 |
-| `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형. 자동 이동 + 강제 중단 |
-| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화. Inspector on/off |
-
-### v0.28 코드 수정 내역
-
-| 파일 | 버전 | 변경 내용 |
-|---|---|---|
-| `BossKnight.cs` | v1.1 | `base.Awake()` 제거. `_settings` null 허용. `HpRatio` override 추가. `_settings(EnemyDataSO)` 는 Inspector에서 비워두면 됨 |
-| `BossCounterSystem.cs` | v1.1 | 대타 출동 주먹 봉인 수정. `ForceUnlock()` → `SealComponent.ApplySealByType(SealType.Dash, duration)`. `_interceptHandSeals` 필드 추가 |
-| `BossPartComponent.cs` | v1.1 | `_partSpriteRenderer` 자동 취득. 자물쇠 해제 시 `HitFeedback.LockUnlocked()`, 재잠금 시 `HitFeedback.SealApplied()` 호출 |
-
-**핵심 수정: BossKnight._settings 슬롯**
-```
-EnemyBase를 상속하면 Inspector에 _settings(EnemyDataSO) 슬롯이 나타남
-→ BossKnight는 EnemyDataSO 대신 BossKnightDataSO를 사용
-→ _settings는 null로 비워두면 됨
-→ base.Awake()가 null 체크로 비활성화하는 문제를 우회 처리
-```
-
-### 완료된 패턴 구현체 (v0.27)
-
-| 컴포넌트 | 버전 | 역할 |
-|---|---|---|
+| `BossPartComponent.cs` | v1.3 | 부위별 봉인 상태 + 색상 피드백 |
+| `BossCoreLock.cs` | v1.2 | 코어 활성 조건 + 딜타임 종료 시 양팔 해제 |
+| `BossCounterSystem.cs` | v1.1 | 검 무식/대타 출동 |
+| `BossShockwave.cs` | v1.0 | 충격파 전용 |
+| `BossExecutionHandler.cs` | v1.1 | A키 홀드 처형. 처형 흐름 재설계 |
+| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화 |
 | `BossPattern_ShieldCharge.cs` | v1.0 | Phase 1 방패 돌진 |
 | `BossPattern_DefenseStance.cs` | v1.0 | Phase 1 방어 자세 |
 | `BossPattern_PunchR.cs` | v1.0 | Phase 1 주먹 공격 |
-| `BossPattern_Advance.cs` | v1.0 | Phase 2 전방 진군 (3연속 돌진) |
-| `BossPattern_Charge.cs` | v1.0 | Phase 2 전방 돌격 (긴 돌진) |
+| `BossPattern_Advance.cs` | v1.0 | Phase 2 전방 진군 |
+| `BossPattern_Charge.cs` | v1.0 | Phase 2 전방 돌격 |
 | `BossPattern_SwordSlash7.cs` | v1.0 | Phase 2 검 제식 7 |
 | `BossPattern_SwordSlash12.cs` | v1.0 | Phase 2 검 제식 12 |
-| `BossPattern_SwordSlash4.cs` | v1.0 | Phase 3 검 제식 4 (도넛 원형) |
-| `BossPattern_SwordSlash0.cs` | v1.0 | Phase 3 검 제식 0 (4회 확장) |
-| `BossPattern_SwordSlash1.cs` | v1.0 | Phase 3 검 제식 1 (직선 돌진 찌르기) |
+| `BossPattern_SwordSlash4.cs` | v1.0 | Phase 3 검 제식 4 |
+| `BossPattern_SwordSlash0.cs` | v1.0 | Phase 3 검 제식 0 |
+| `BossPattern_SwordSlash1.cs` | v1.0 | Phase 3 검 제식 1 |
 | `BossPattern_PunchDash.cs` | v1.0 | Phase 3 주먹 돌진 |
 | `BossPattern_Grab.cs` | v1.0 | Phase 3 횡 잡기 |
 
@@ -870,32 +906,14 @@ EnemyBase를 상속하면 Inspector에 _settings(EnemyDataSO) 슬롯이 나타�
 
 | 항목 | 상태 | 메모 |
 |---|---|---|
-| 검 무식 vs 대타 출동 발동 기준 | ✅ 확정 | 상태표 참고 |
-| A키 홀드 처형 메커니즘 | ✅ 확정 | 그로기 회복 시 강제 중단 + 충격파 |
-| Phase 전환 자물쇠 초기화 | ✅ 확정 | 전부 초기화 |
-| 코어 딜타임 지속시간 | ✅ 7초 | DataSO 수정 가능 |
-| 3Phase 코어 조건 | ✅ 확정 | 왼팔 + 오른팔 2개 (주먹 팔 제외) |
-| 대타 출동 주먹 봉인 | ✅ 확정 | 봉인 적용 + 해당 패턴 시전 불가 |
-| BossPatternBase 추상 베이스 | ✅ 완료 | v1.0. Warning/Active/Recovery 3단계 |
-| BossKnightAI 보스 전용 AI | ✅ 완료 | v1.0. 10상태 + 회피기동 + Counter |
-| BossKnight 루트 컴포넌트 | ✅ 완료 | v1.1. base.Awake() 우회. HpRatio override |
-| BossPhaseManager | ✅ 완료 | v1.0. HP 임계값 감시 |
-| BossPartComponent | ✅ 완료 | v1.1. HitFeedback 연동. _partSpriteRenderer 자동 취득 |
-| BossCoreLock | ✅ 완료 | v1.0. 코어 활성 조건 + 딜타임 |
-| BossCounterSystem | ✅ 완료 | v1.1. SealComponent.ApplySealByType 연동 |
-| BossShockwave | ✅ 완료 | v1.0. 밀침 전용 |
-| BossExecutionHandler | ✅ 완료 | v1.0. A키 홀드 처형 |
-| BossRangeIndicator | ✅ 완료 | v1.0. Inspector on/off |
-| BossKnightDataSO | ✅ 완료 | v1.0. Phase별 struct 분리 |
-| Phase 1 패턴 구현체 3개 | ✅ 완료 | v0.27 |
-| Phase 2 패턴 구현체 4개 | ✅ 완료 | v0.27 |
-| Phase 3 패턴 구현체 5개 | ✅ 완료 | v0.27 SwordSlash4/0/1 명칭 적용 |
-| BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
-| LockComponent ForceUnlock() 패치 | ✅ 완료 | v0.28 |
-| InputManager IsAttackHeld 패치 | ✅ 완료 | v0.28 |
+| Phase 1 전투 구조 수정 | ✅ v0.29 | 역방향 잠금 구조로 전면 개정 |
+| BossPartComponent 색상 피드백 | ✅ v1.3 | 잠금=파랑, 해제=빨강 |
+| BossCoreLock 딜타임 종료 양팔 해제 | ✅ v1.2 | ExitDilTime() ForceUnlock 추가 |
+| BossKnight TakeDamage 수정 | ✅ v1.2 | 딜타임 중 코어만 HP 감소 |
+| EnemyBossBase 분리 | ✅ v1.0 | EnemyBase 억지 상속 해소 |
+| BossExecutionHandler 처형 흐름 | ✅ v1.1 | A키 홀드 즉시 이동 + Rigidbody2D |
 | SealComponent ApplySealByType() 패치 | 🔲 패치 필요 | SealComponent_patch.txt |
-| 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
-| Boss_Knight Prefab 구성 가이드 | ✅ 완료 | v0.27 Boss_Knight_Prefab_Guide.md |
-| Boss_Knight Prefab 에디터 구성 | ✅ 완료 | v0.28 7개 버그 수정 완료 |
+| BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
 | 보스 Animator Controller | 🔲 미착수 | 보스 전용 Controller 제작 필요 |
+| 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
 | 보스 룸 씬 구성 | 🔲 미착수 | |

@@ -291,33 +291,31 @@ namespace KEY
         /// <summary>
         /// 보스 피격 처리.
         ///
+        /// [Phase1 수정 구조 — v0.29 기획]
+        ///   딜타임 중 코어 피격만 HP 감소 허용
+        ///   팔/방패 부위 해제되어도 직접 피격 불가
+        ///   → 팔 해제 = 코어 활성 조건 실패 상태 (약점 노출 아님)
+        ///
         /// [분기]
-        ///   딜타임 상태      → base.TakeDamage() (HP 감소)
-        ///   자물쇠 전부 해제 → base.TakeDamage() (HP 감소)
-        ///   그 외            → 무시
+        ///   딜타임 상태 → base.TakeDamage() (코어 직접 피격 → HP 감소)
+        ///   그 외        → 무시 (팔/방패 해제 여부 무관)
         ///
         /// [_isPhaseInvincible / iFrame 체크]
         ///   EnemyBossBase.TakeDamage() 에서 진입 전에 처리.
-        ///   이 override 는 조건 충족 시만 호출됨.
         /// </summary>
         public override void TakeDamage(DamageInfo info)
         {
-            // 딜타임 상태 → 코어에 직접 피해 허용
+            // 딜타임 중에만 피격 허용 (코어 집중 공격 구간)
             if (_ai.IsDilTime)
             {
                 base.TakeDamage(info);
                 return;
             }
 
-            // 자물쇠 전부 해제 → 본체 피격 허용
-            if (IsAllLocksCleared())
-            {
-                base.TakeDamage(info);
-            }
-            else
-            {
-                Debug.Log("[BossKnight] 본체 피격 → 자물쇠 미해제, 무시");
-            }
+            // 딜타임 외 피격 무시
+            // Phase1: 팔/방패 해제 여부와 관계없이 직접 피격 불가
+            // 딜타임 구간에서만 코어를 통해 HP 감소 가능
+            Debug.Log("[BossKnight] 피격 무시 — 딜타임 외 구간");
         }
 
         // ══════════════════════════════════════════════════════
@@ -509,14 +507,17 @@ namespace KEY
 
         /// <summary>
         /// 현재 Phase 의 모든 부위 자물쇠 해제 여부 확인.
-        /// TakeDamage 분기 조건에 사용.
+        /// Phase2/3 에서 추후 사용 예정.
+        /// Phase1 에서는 TakeDamage 에서 사용하지 않음
+        /// (딜타임 중 코어 피격만 허용하는 구조로 변경됨).
+        /// 코어 타입은 항상 제외 (코어는 별도 딜타임 구조로 처리).
         /// </summary>
         private bool IsAllLocksCleared()
         {
             foreach (var part in _allParts)
             {
                 if (part == null) continue;
-                if (part.PartType == BossPartType.Core) continue;
+                if (part.PartType == BossPartType.Core) continue; // 코어 제외
                 if (!part.IsCurrentPhaseActive(_currentPhase)) continue;
                 if (!part.IsUnlocked) return false;
             }

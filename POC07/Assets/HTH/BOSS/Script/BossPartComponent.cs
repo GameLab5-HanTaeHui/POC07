@@ -1,6 +1,20 @@
 ﻿// ============================================================
-// BossPartComponent.cs  v1.2
+// BossPartComponent.cs  v1.3
 // 보스 부위 컴포넌트 — 봉인 상태 + 약점 노출 관리
+//
+// [v1.3 변경 — 색상 피드백 추가]
+//
+//   [추가]
+//     _partSpriteRenderer : 부위 SpriteRenderer (자식 자동 탐색)
+//     _lockedColor        : 잠금 상태 색상 (기본 파란색)
+//     _unlockedColor      : 해제 상태 색상 (기본 붉은색)
+//     RefreshColor()      : 상태 변화 시 색상 즉시 갱신
+//
+//   [색상 적용 시점]
+//     Initialize()         → 잠금 색상 적용
+//     HandleLockUnlocked() → 해제 색상 적용
+//     ReLock()             → 잠금 색상 복귀
+//     비활성 Phase         → 색상 변경 없음 (원본 유지)
 //
 // [v1.2 변경 — SpeedMultiplier 방향 수정]
 //
@@ -122,6 +136,30 @@ namespace KEY
         [Min(1.0f)]
         [SerializeField] private float _sealedSpeedMultiplier = 1.5f;
 
+        [Header("── 색상 피드백 ──────────────────────")]
+
+        /// <summary>
+        /// 부위 SpriteRenderer.
+        /// 잠금/해제 상태에 따라 색상 변경.
+        /// 미연결 시 자식에서 자동 탐색.
+        /// </summary>
+        [Tooltip("부위 SpriteRenderer. 미연결 시 자식에서 자동 탐색.")]
+        [SerializeField] private SpriteRenderer _partSpriteRenderer;
+
+        /// <summary>
+        /// 잠금(Locked) 상태 색상.
+        /// 기본값: 파란색 — 봉인 상태 시각화.
+        /// </summary>
+        [Tooltip("잠금 상태 색상. 기본: 파란색.")]
+        [SerializeField] private Color _lockedColor = new Color(0.3f, 0.5f, 1.0f, 1.0f);
+
+        /// <summary>
+        /// 해제(Unlocked) 상태 색상.
+        /// 기본값: 붉은색 — 해제(위험) 상태 시각화.
+        /// </summary>
+        [Tooltip("해제 상태 색상. 기본: 붉은색.")]
+        [SerializeField] private Color _unlockedColor = new Color(1.0f, 0.3f, 0.3f, 1.0f);
+
         [Header("── 처형 설정 ──────────────────────")]
 
         /// <summary>
@@ -197,6 +235,10 @@ namespace KEY
 
             if (_lockCollider == null && _lockComponent != null)
                 _lockCollider = _lockComponent.GetComponent<Collider2D>();
+
+            // 색상 피드백용 SpriteRenderer 자동 탐색
+            if (_partSpriteRenderer == null)
+                _partSpriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
 
         private void Start()
@@ -247,6 +289,10 @@ namespace KEY
             else
                 ResetSpeedMultiplier();
 
+            // 색상 피드백 — 활성 부위만 적용
+            if (_isActiveInCurrentPhase)
+                RefreshColor();
+
             Debug.Log($"[BossPartComponent] {_partType} 초기화 — " +
                       $"Phase:{phase} 활성:{_isActiveInCurrentPhase} " +
                       $"배율:{(_isActiveInCurrentPhase ? _sealedSpeedMultiplier : 1.0f)}");
@@ -279,6 +325,9 @@ namespace KEY
             // ★ v1.2 수정: 해제 → 패턴 1.0 복귀 (빨라짐 = 위험 증가)
             ResetSpeedMultiplier();
 
+            // 색상 피드백: 해제 = 붉은색
+            RefreshColor();
+
             OnPartUnlocked?.Invoke(_partType);
 
             Debug.Log($"[BossPartComponent] {_partType} 자물쇠 해제 → 패턴 속도 1.0 복귀 (위험 증가)");
@@ -300,6 +349,9 @@ namespace KEY
 
             // ★ v1.2 수정: 재잠금 → 패턴 느림 복귀
             ApplySpeedMultiplier(_sealedSpeedMultiplier);
+
+            // 색상 피드백: 재잠금 = 파란색
+            RefreshColor();
 
             OnPartReLocked?.Invoke(_partType);
 
@@ -341,14 +393,29 @@ namespace KEY
         }
 
         // ══════════════════════════════════════════════════════
+        // 색상 피드백
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 현재 잠금/해제 상태에 맞게 색상 갱신.
+        ///   잠금(Locked)   → _lockedColor   (기본 파란색)
+        ///   해제(Unlocked) → _unlockedColor (기본 붉은색)
+        /// </summary>
+        private void RefreshColor()
+        {
+            if (_partSpriteRenderer == null) return;
+            _partSpriteRenderer.color = _isUnlocked ? _unlockedColor : _lockedColor;
+        }
+
+        // ══════════════════════════════════════════════════════
         // Gizmos
         // ══════════════════════════════════════════════════════
 
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = _isUnlocked
-                ? new Color(1f, 0.8f, 0f, 0.5f)   // 노란색 = 해제
-                : new Color(0.3f, 0.3f, 1f, 0.5f); // 파란색 = 봉인
+                ? new Color(1f, 0.3f, 0.3f, 0.5f)   // 붉은색 = 해제
+                : new Color(0.3f, 0.5f, 1f, 0.5f);   // 파란색 = 잠금
 
             Gizmos.DrawWireSphere(transform.position, 0.4f);
 
@@ -357,7 +424,7 @@ namespace KEY
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * 0.6f,
                 $"{_partType} " +
-                $"{(_isUnlocked ? "[해제] 속도:1.0" : $"[봉인] 속도:{_sealedSpeedMultiplier}")} " +
+                $"{(_isUnlocked ? "[해제🔴] 속도:1.0" : $"[잠금🔵] 속도:{_sealedSpeedMultiplier}")} " +
                 $"{(_isActiveInCurrentPhase ? "" : "[비활성]")}");
 #endif
         }

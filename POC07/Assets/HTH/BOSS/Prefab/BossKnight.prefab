@@ -81,7 +81,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -237,7 +237,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: -5241291705561067677, guid: 2cdaba750c78716428f1ef29ee655a11, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -274,6 +274,9 @@ MonoBehaviour:
   - {fileID: 4677473133189510888}
   - {fileID: 7497206956754043641}
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &2348149076575492396
 BoxCollider2D:
@@ -724,7 +727,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -879,7 +882,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1065,7 +1068,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1201,7 +1204,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -1521,7 +1524,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1676,7 +1679,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1973,7 +1976,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -2070,7 +2073,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2227,7 +2230,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: -5836736191948761875, guid: 2cdaba750c78716428f1ef29ee655a11, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2303,6 +2306,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 1066653899286325315}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!114 &2019900418286469324
 MonoBehaviour:
@@ -2430,7 +2436,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: 712035800519618848, guid: f33d8583288dbc84a81adc0dd3fbbf32, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2460,6 +2466,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 4604379842456145459}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &6307559419664829961
 BoxCollider2D:
@@ -2569,7 +2578,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -2789,7 +2798,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2865,6 +2874,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 4840739885641569293}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!1 &6599010614339815743
 GameObject:
@@ -2948,7 +2960,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: 720000440436205499, guid: c2495ed860dba3b48bd37d0d5163e8d2, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2978,6 +2990,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 8331746079172192574}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &5983026160061891008
 BoxCollider2D:
@@ -3106,7 +3121,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -3514,7 +3529,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: 712035800519618848, guid: f33d8583288dbc84a81adc0dd3fbbf32, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -3544,6 +3559,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 8162542897744094519}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &7480588467552410817
 BoxCollider2D:
@@ -3705,7 +3723,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: -5241291705561067677, guid: 2cdaba750c78716428f1ef29ee655a11, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -3781,6 +3799,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 289322506147741905}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!114 &5038355210814872210
 MonoBehaviour:
@@ -4038,7 +4059,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: -5836736191948761875, guid: 2cdaba750c78716428f1ef29ee655a11, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -4071,6 +4092,9 @@ MonoBehaviour:
   - {fileID: 6144406417756928931}
   - {fileID: 3260646834588783646}
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &7993482421959399111
 BoxCollider2D:
@@ -4211,7 +4235,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -4289,7 +4313,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -4367,7 +4391,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -4464,7 +4488,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 20
   m_MaskInteraction: 0
   m_Sprite: {fileID: -8741545005956383620, guid: 1a3cb5c701532444eae05a87fabfbdc4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -5385,7 +5409,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: 712035800519618848, guid: f33d8583288dbc84a81adc0dd3fbbf32, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -5415,6 +5439,9 @@ MonoBehaviour:
   _lockCollider: {fileID: 7081113606833485495}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
+  _partSpriteRenderer: {fileID: 0}
+  _lockedColor: {r: 0.3, g: 0.5, b: 1, a: 1}
+  _unlockedColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   _executionRangeOverride: 0
 --- !u!61 &3074977505703683522
 BoxCollider2D:

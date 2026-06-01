@@ -1,6 +1,20 @@
 ﻿// ============================================================
-// BossCoreLock.cs  v1.1
+// BossCoreLock.cs  v1.2
 // 보스 코어 자물쇠 — 활성 조건 감지 + 딜타임 관리
+//
+// [v1.2 변경 — 딜타임 종료 후 양팔 강제 해제]
+//
+//   [기획 수정 (v0.29)]
+//     Phase1 구조: 양팔 잠금 유지 → 코어 활성 → 딜타임
+//     딜타임 종료 후: 보스가 양팔 자물쇠를 스스로 풀어버림
+//     → 플레이어는 다시 양팔을 재잠금해야 코어 재활성 가능
+//
+//   [수정 내용]
+//     ExitDilTime() 에서 _armL.ForceUnlock() / _armR.ForceUnlock() 호출
+//     → 딜타임 종료 순서:
+//       1. 자동 코어 봉인 (DeactivateCore)
+//       2. 양팔 강제 해제 (ForceUnlock) — 보스 탈출
+//       3. 충격파 발동 (TriggerShockwave)
 //
 // [v1.1 변경 — IsGroggy 조건 제거]
 //
@@ -287,16 +301,39 @@ namespace KEY
 
         /// <summary>
         /// 딜타임 종료.
-        /// 자동 코어 봉인 + 충격파 발동.
+        ///
+        /// [v1.2 수정 — 종료 순서]
+        ///   1. 자동 코어 봉인 (DeactivateCore)
+        ///   2. 양팔 강제 해제 (ForceUnlock) — 보스 탈출
+        ///   3. 충격파 발동 (TriggerShockwave)
+        ///
+        /// [Phase1 흐름]
+        ///   딜타임 종료 → 양팔 해제
+        ///   → 플레이어가 다시 양팔을 재잠금해야 코어 재활성
         /// </summary>
         private void ExitDilTime()
         {
             _isDilTimeActive = false;
 
+            // 1. 자동 코어 봉인
             DeactivateCore();
+
+            // 2. 양팔 강제 해제 — 보스가 자물쇠를 스스로 풀어버림
+            if (_armL != null && _armL.IsLocked)
+            {
+                _armL.ForceUnlock();
+                Debug.Log("[BossCoreLock] 딜타임 종료 → 왼팔 자물쇠 강제 해제");
+            }
+            if (_armR != null && _armR.IsLocked)
+            {
+                _armR.ForceUnlock();
+                Debug.Log("[BossCoreLock] 딜타임 종료 → 오른팔 자물쇠 강제 해제");
+            }
+
+            // 3. 충격파
             _boss?.TriggerShockwave();
 
-            Debug.Log("[BossCoreLock] 딜타임 종료 → 코어 자동 봉인 + 충격파");
+            Debug.Log("[BossCoreLock] 딜타임 종료 → 코어 봉인 + 양팔 해제 + 충격파");
         }
     }
 }
