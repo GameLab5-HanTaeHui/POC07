@@ -125,8 +125,8 @@ namespace KEY
         /// 충격파 컴포넌트.
         /// 딜타임 종료 시 호출. 미연결 시 스킵.
         /// </summary>
-        [Tooltip("BossShockwave. 미연결 시 충격파 스킵.")]
-        [SerializeField] private BossShockwave _shockwave;
+        [Tooltip("TestBossShockwave. 미연결 시 충격파 스킵.")]
+        [SerializeField] private TestBossShockwave _shockwave;
 
         // ──────────────────────────────────────────
         // 컴포넌트 참조
@@ -297,8 +297,6 @@ namespace KEY
             OnGroggyExit += _execution.OnGroggyExit;
 
             // 충격파 초기화 (미연결 시 스킵)
-            if (_shockwave != null && _data != null)
-                _shockwave.Initialize(null); // BossKnightDataSO 없이 수동 관리
 
             Debug.Log("[TestBossCore] 초기화 완료. 핵심 플레이 루프 준비됨.");
         }
@@ -559,7 +557,7 @@ namespace KEY
             if (_shockwave != null)
                 _shockwave.Trigger(transform.position);
             else
-                Debug.Log("[TestBossCore] 충격파 스킵 (BossShockwave 미연결)");
+                Debug.Log("[TestBossCore] 충격파 스킵 (TestBossShockwave 미연결)");
 
             // 4. 본체 색상 복구
             if (_spriteRenderer != null)

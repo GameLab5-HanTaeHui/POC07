@@ -314,6 +314,7 @@ GameObject:
   - component: {fileID: 2305401549654009775}
   - component: {fileID: 1428830662360480358}
   - component: {fileID: 5724810485760124141}
+  - component: {fileID: 7889989144940949961}
   m_Layer: 15
   m_Name: TestBoss
   m_TagString: Untagged
@@ -522,7 +523,7 @@ MonoBehaviour:
   _armR: {fileID: 7621204146408985440}
   _coreObject: {fileID: 144895318575177576}
   _coreSpriteRenderer: {fileID: 9216639898491200685}
-  _shockwave: {fileID: 0}
+  _shockwave: {fileID: 7889989144940949961}
 --- !u!114 &1428830662360480358
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -567,6 +568,30 @@ MonoBehaviour:
   _hitFlashDuration: 0.1
   _hitShakeStrength: 0.15
   _deathShrinkDuration: 0.5
+--- !u!114 &7889989144940949961
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8943e462385f6b74b9814393744ace6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossShockwave
+  _shockwaveRadius: 8
+  _shockwavePower: 20
+  _upwardBias: 0.4
+  _playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
+  _hitStopDuration: 0.08
+  _hitStopTimeScale: 0.02
+  _cameraTransform: {fileID: 0}
+  _cameraShakeStrength: 0.3
+  _cameraShakeDuration: 0.3
+  _shockwaveEffect: {fileID: 0}
 --- !u!1 &1990324531168466286
 GameObject:
   m_ObjectHideFlags: 0
