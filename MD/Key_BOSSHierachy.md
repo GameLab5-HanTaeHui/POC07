@@ -1,846 +1,371 @@
-# Key_BOSS — 보스 기획 문서
+# Key_BOSSHierarchy — 보스 기사 오브젝트 배치도
 
 Unity 버전 6000.3.10f1 | 2D Universal | namespace : KEY
 
 ---
 
-## 개요
+## 규칙
 
-보스 1 — 봉인된 기사 (The Sealed Knight)
-
-README 의 핵심 전투 루프를 처음으로 완전하게 체험시키는 보스.
-
-```
-Lock → Unlock → Re-Lock → Break → Expose → Execute
-```
-
-일반 기사(EnemyKnight)와의 차별점:
-- 자물쇠가 부위별로 분리되어 있고 각각 독립적으로 작동
-- 자물쇠 해제가 단순 약점 노출이 아니라 패턴 변화를 유발
-- 해제된 부위는 A키 홀드 처형으로 재잠금 가능
-- 3페이즈 구조로 단계마다 전투 방식이 완전히 달라짐
-- 검 무식 / 대타 출동 반격 시스템 존재
+- `[컴포넌트]` : 해당 오브젝트에 부착된 컴포넌트
+- `(SO)` : ScriptableObject 참조
+- `*` : 필수 연결 항목
+- 들여쓰기 = 부모-자식 관계
+- `Phase X` : 해당 페이즈에서만 활성화
 
 ---
 
-## 공통 규칙
+## Layer 설정
 
-### 물리 / 충돌
-
-```
-플레이어 ↔ 보스 충돌 판정 없음
-→ 겹칠 수 있음
-→ 공격 히트박스만 판정
-
-충격파 (Shockwave)
-→ 데미지 없음
-→ 플레이어 밀침 전용
-→ Phase 전환 시 / 그로기 회복 시 / 딜타임 종료 시 발동
-```
-
-### Phase 전환 규칙
-
-```
-Phase 1 → Phase 2 : HP 50% 도달
-Phase 2 → Phase 3 : HP 0% 도달 후 HP 100% 회복
-
-Phase 전환 시
-  → 플레이어 공격 무시 (전환 애니메이션 재생 중)
-  → 충격파 발생 (플레이어 밀침)
-  → 자물쇠 전부 초기화 (봉인 상태로 복귀)
-  → 전환 애니메이션 완료 후 전투 재개
-```
-
-### 패턴 상태 정의
-
-모든 패턴은 4단계 생애주기를 가진다.
-
-```
-[시전 대기 (Ready)]
-  쿨타임 완료 + 조건 충족 상태
-  패턴 선택 전 대기
-  이 상태에서 해당 부위 봉인 시 패턴 발동 불가
-
-[예고 (Warning)]
-  패턴 선택 완료
-  예고 모션 재생
-  예상 범위 시각화 표시 (Inspector on/off 가능)
-  플레이어에게 패턴 인식 시간 제공
-  봉인 가능 패턴 / 불가 패턴 분기 발생
-
-[시전 중 (Active)]
-  패턴 실제 실행
-  히트박스 활성
-  패턴별 봉인 처리 다름
-
-[후딜레이 (Recovery)]
-  패턴 종료 후 짧은 경직
-  플레이어 공격 가능 구간
-  일부 패턴은 그로기로 연결
-```
-
-### 회피 기동
-
-```
-모든 패턴 쿨타임 상태일 경우
-  → 플레이어를 추적하며 회피 기동 실행
-
-회피 기동 종류
-  순간이동 (플레이어 반대편으로)
-  백스탭 (전진 중 순간 후퇴)
-
-발동 조건
-  전 패턴 쿨타임 + 일정 대기시간 이상 (DataSO 수정 가능)
-  너무 자주 발동되지 않도록 쿨타임 존재
-  (자주 일어나면 플레이어 공격 기회 박탈)
-```
-
-### A키 홀드 처형 메커니즘
-
-```
-[발동 조건]
-  보스 그로기 상태
-  + 해당 부위 범위 내
-  + A키 홀드 일정 시간 이상
-
-[처형 진행]
-  플레이어 → 해당 부위 위치로 자동 이동
-  홀드 시간 채움 → 잠금 / 해제 실행
-
-[그로기 회복 시 강제 중단]
-  처형 동작 즉시 끊김
-  충격파 발생 (데미지 없음, 밀침만)
-  플레이어 밀쳐냄 후 전투 복귀
-
-[홀드 시간]
-  DataSO 에서 수정 가능
-```
-
----
-
-## 반격 패턴 시스템
-
-### 검 무식 (Parry)
-
-```
-[역할]
-  플레이어의 봉인 투사체를 검으로 쳐내는 반응형 패턴
-
-[트리거]
-  봉인 투사체 감지
-
-[발동 조건]
-  _isCounterActive == false
-  그로기 / 딜타임 상태 아님
-  전투 대기 중 또는 허용된 상태
-
-[정면 봉인]
-  즉발 검으로 쳐냄
-
-[후방 봉인]
-  180도 회전 (0.2초)
-  → 검으로 쳐냄
-
-[초기 쿨타임]
-  전투 시작 후 10~15초 (DataSO 수정 가능)
-  이후 Phase 2 쿨타임: 60초
-      Phase 3 쿨타임: 30초
-
-[후딜레이]
-  0.3초
-```
-
-### 대타 출동 (Intercept)
-
-```
-[역할]
-  패턴 시전 중 봉인 투사체를 주먹이 대신 맞아주는 희생형 패턴
-
-[트리거]
-  패턴 시전 중 봉인 투사체 감지
-
-[발동 조건]
-  _isCounterActive == false
-  패턴 시전 중 상태
-  가용 주먹 존재 (봉인되지 않은 주먹)
-
-[처리]
-  가장 가까운 가용 주먹 발동
-  → 주먹이 봉인 투사체 앞으로 이동하여 맞음
-  → 해당 주먹 봉인 상태 진입
-  → 봉인 지속시간 동안 해당 주먹 사용 패턴 시전 불가
-  → 봉인 해제 후 정상 복귀
-
-[가용 주먹 없을 경우]
-  대타 출동 발동 불가
-  → 봉인 투사체 그냥 적중
-
-[후딜레이]
-  없음
-```
-
-### _isCounterActive 플래그
-
-```
-검 무식 또는 대타 출동 발동 시작 → true
-발동 완료 시                     → false
-
-true 상태에서 새 봉인 투사체 감지 → 전부 무시
-(투사체는 그냥 적중하거나 소멸)
-```
-
-### 반격 패턴 상태표
-
-| 현재 상태 | 검 무식 | 대타 출동 |
+| Layer 이름 | 번호 | 용도 |
 |---|---|---|
-| 그로기 | ❌ | ❌ |
-| 딜타임 | ❌ | ❌ |
-| 예고 중 (봉인 불가 패턴) | ❌ | ❌ |
-| 예고 중 (봉인 가능 / Phase 1·2) | ✅ 패턴 일시 중지 후 재개 | ❌ |
-| 예고 중 (봉인 가능 / Phase 3 검) | 🔲 대타 불가 시 발동 | ✅ 우선 |
-| 예고 중 (봉인 가능 / Phase 3 주먹) | ❌ | ✅ |
-| 패턴 시전 중 | ❌ | ✅ |
-| 후딜레이 | ❌ | ❌ |
-| 전투 대기 중 | ✅ | ❌ |
-| 검 무식 중 | ❌ | ❌ |
-| 대타 출동 중 | ❌ | ❌ |
-| _isCounterActive = true | ❌ | ❌ |
+| Enemy | 15 | 보스 본체 / 코어 |
+| EnemyLock | 17 | 자물쇠 콜라이더 |
+| EnemyShield | 18 | 방패 콜라이더 |
+| EnemyAttackHit | 16 | 보스 공격 히트박스 |
+| BossRange | 19 | 예상 범위 시각화 전용 (충돌 없음) |
 
 ---
 
-## Phase 1 — 봉인된 기사
-
-### 기본 설정
+## Boss_Knight Prefab 구조
 
 ```
-HP 범위       : 100% ~ 50%
-이동 속도     : 느림 (다수 봉인 상태)
-기본 상태     : 방패, 왼팔, 오른팔 전부 봉인
-전방 공격     : 방패로 인해 전방 완전 차단 (봉인 상태 무관)
-```
-
-### 자물쇠 구조
-
-```
-방패 자물쇠 (ShieldLock)
-  위치: 방패 부위
-  해제 전: 방패 돌진 불가 (방어 자세 + 밀치기만 가능)
-  해제 후: 방패 돌진 패턴 활성화
-           전방 공격 무효 유지
-  재잠금: A키 홀드 처형으로 재봉인 가능
-
-왼팔 자물쇠 (ArmLLock)
-  위치: 왼팔 부위
-  해제 전: 왼팔 봉인 상태 — 방패 패턴 속도/시전 느림
-  해제 후: 약점 부위 노출 (직접 공격 가능)
-           방패 패턴 시전 시간 단축 + 속도 증가 (위험 증가)
-  재잠금: A키 홀드 처형으로 재봉인 가능
-
-오른팔 자물쇠 (ArmRLock)
-  위치: 오른팔 부위
-  해제 전: 오른팔 봉인 상태 — 주먹 공격 속도/시전 느림
-  해제 후: 약점 부위 노출 (직접 공격 가능)
-           주먹 공격 시전 시간 단축 + 속도 증가 (위험 증가)
-  재잠금: A키 홀드 처형으로 재봉인 가능
-```
-
-### 패턴 목록
-
-**1. 방패 돌진**
-
-```
-[발동 조건]
-  방패 자물쇠 해제 상태에서만 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[시전 대기]
-  방패 자물쇠 해제 확인
-  플레이어 방향 조준
-
-[예고] 1.5초
-  방패를 앞으로 치켜 올리는 모션
-  전방 돌진 예상 범위 표시
-  봉인 불가 구간
-
-[시전 중]
-  전방 직선 돌진
-  벽 충돌 or 일정 거리 도달 시 종료
-  돌진 중 봉인 → 그로기 즉시 진입
-
-[후딜레이] 1.0초
-  벽 충돌 시 → 그로기 자동 전환
-  정상 종료 시 → 짧은 경직만
-```
-
-**2. 방어 자세**
-
-```
-[발동 조건]
-  항상 발동 가능 (조건 없음)
-  쿨타임: DataSO 수정 가능
-
-[시전 대기]
-  플레이어 방향 확인
-
-[예고] 0.5초
-  방패를 정면에 세우는 모션
-  방어 범위 표시
-
-[시전 중] 2.0~4.0초 (DataSO 수정)
-  전방 피해 완전 차단
-  봉인 가능 구간 (Guard SealType)
-  → Guard 봉인 성공 시
-     방어 자세 강제 해제
-     짧은 경직 발생
-     플레이어 공격 기회
-
-[후딜레이] 0.5초
-  자세 해제 모션
-```
-
-**3. 주먹 공격**
-
-```
-[발동 조건]
-  오른팔 자물쇠 해제 상태에서만 발동
-  오른팔 봉인 중 → 속도/시전 시간 감소 적용
-
-[시전 대기]
-  오른팔 해제 확인
-  플레이어 위치 조준
-
-[예고]
-  오른팔 봉인 상태:   1.2초
-  오른팔 해제 상태:   0.7초 (단축)
-  오른팔을 높이 드는 모션
-  지면 타격 예상 범위 표시 (원형)
-  봉인 불가 구간
-
-[시전 중]
-  지면 내리찍기
-  충격파 범위 히트박스 활성
-  봉인 불가
-
-[후딜레이]
-  오른팔 봉인 상태: 0.8초
-  오른팔 해제 상태: 0.4초 (단축)
-  플레이어 공격 가능 구간
-```
-
-### 플레이어 공격 가능 구조
-
-```
-기본 구조
-  봉인된 부위는 피해 무시
-  그로기 상태 / 후딜레이 구간에서 공격 가능
-
-자물쇠 해제 후
-  해당 부위 약점 노출 → 직접 피해 가능
-  단 해제할수록 패턴 위험도 증가
-
-재잠금 (A키 홀드 처형)
-  그로기 상태에서 해당 부위 범위 내
-  A키 홀드 → 자동 이동 → 재봉인 실행
-  재봉인 시 패턴 속도/시전 시간 원래대로 복귀
-  그로기 회복 시 처형 강제 중단 + 충격파
-```
-
----
-
-## Phase 2 — 분노한 기사
-
-### 기본 설정
-
-```
-HP 범위       : 50% ~ 0%
-진입 연출     : 충격파 + Phase 전환 애니메이션
-무기 변화     : 왼손 방패 유지 / 오른손 검 꺼내 듦
-자물쇠 초기화 : Phase 1 해제 상태 전부 초기화
-이동 속도     : Phase 1 보다 빠름
-```
-
-### 자물쇠 구조
-
-```
-검 자물쇠 (SwordLock)
-  위치: 오른손 검 부위
-  해제 전: 검 제식 7 봉인 가능 구간 존재
-  해제 후: 검 제식 7 봉인 불가 전환
-
-왼팔 자물쇠 (ArmLLock)
-  위치: 왼팔 부위
-  해제 전: 왼팔 사용 패턴 속도/시전 느림
-  해제 후: 약점 노출 + 패턴 가속
-
-오른팔 자물쇠 (ArmRLock)
-  위치: 오른팔 부위
-  해제 전: 오른팔 사용 패턴 속도/시전 느림
-  해제 후: 약점 노출 + 패턴 가속
-
-코어 자물쇠 (CoreLock)
-  위치: 가슴 중앙 코어
-  기본 상태: 비활성 (보이지 않음)
-  활성 조건: 왼팔 + 오른팔 동시 봉인 상태
-  활성 후: A키 홀드 처형으로 코어 해제 가능
-           코어 해제 → 딜타임 진입
-```
-
-### 코어 딜타임 구조
-
-```
-[진입 조건]
-  그로기 상태에서 왼팔 + 오른팔 동시 봉인
-  → 코어 자물쇠 활성화 (시각적 표시)
-  → A키 홀드 처형 → 딜타임 진입
-
-[딜타임 중]
-  보스 완전 정지
-  코어에 피해 적용 (직접 공격)
-  검 무식 / 대타 출동 발동 불가
-  지속시간: 7초 (DataSO 수정 가능)
-
-[딜타임 종료]
-  자동 코어 봉인
-  충격파 발생 (데미지 없음, 밀침만)
-  전투 상태 복귀
-  왼팔 / 오른팔 봉인 상태 유지 or 해제 (DataSO 설정)
-```
-
-### 패턴 목록
-
-**1. 전방 진군 (3연속 돌진)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.0초
-  방패를 정면에 두고 전진 자세
-  3회 돌진 예상 경로 표시
-  봉인 가능 구간
-
-[시전 중]
-  1회 돌진 (짧음)
-  → 정지 0.3초 ← 이 구간에서 봉인 감지
-  → 2회 돌진
-  → 정지 0.3초 ← 봉인 감지
-  → 3회 돌진
-  3회 중 1회라도 봉인 성공 → 그로기 즉시 진입
-  3회 전부 완료 → 후딜레이
-
-[후딜레이] 0.6초
-  짧은 경직
-```
-
-**2. 전방 돌격 (긴 돌진)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 2.0초
-  방패를 내리고 크게 웅크리는 모션
-  긴 돌진 예상 범위 표시 (화면 끝까지)
-  봉인 불가 구간
-
-[시전 중]
-  빠른 직선 돌진
-  봉인 불가
-  벽 충돌 시 그로기 진입
-
-[후딜레이] 0.5초
-  벽 미충돌 시 짧은 경직
-```
-
-**3. 검 제식 7 (횡베기 1회)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.5초
-  검을 옆으로 크게 빼는 모션
-  횡베기 범위 표시 (부채꼴)
-  봉인 가능 구간
-  → 예고 중 봉인 성공
-     패턴 일시 중지
-     검 무식 발동 (투사체 쳐냄)
-     검 무식 완료 후 패턴 재개
-
-[시전 중]
-  빠른 횡베기 1회
-  봉인 불가
-
-[후딜레이] 0.7초
-  검을 거두는 모션
-```
-
-**4. 검 제식 12 (짧은 베기 + 긴 베기)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 0.8초
-  검을 앞으로 내미는 모션
-  범위 표시
-  봉인 불가 구간
-
-[시전 중]
-  짧은 베기 → 즉시 → 긴 베기
-  연속 공격이라 봉인 불가
-
-[후딜레이] 0.5초
-```
-
-**5. 검 무식**
-
-```
-[역할]
-  플레이어 봉인 투사체를 검으로 쳐냄
-  반응형 — 예고 없음
-
-[트리거]
-  봉인 투사체 감지
-
-[초기 쿨타임]
-  전투 시작 후 10~15초 (DataSO 수정)
-
-[쿨타임]
-  60초 (DataSO 수정)
-
-[정면 봉인]
-  즉발 검으로 쳐냄
-
-[후방 봉인]
-  0.2초 회전 후 검으로 쳐냄
-
-[후딜레이] 0.3초
-
-[제한]
-  그로기 / 딜타임 중 발동 불가
-  _isCounterActive = true 중 발동 불가
-  다른 패턴 시전 중 발동 불가
-```
-
-### 플레이어 공격 가능 구조
-
-```
-각 패턴 후딜레이 구간 → 직접 공격 가능
-
-딜타임 구조 공략
-  그로기 상태 진입
-  → 왼팔 봉인 (A키 홀드 처형)
-  → 오른팔 봉인 (A키 홀드 처형)
-  → 코어 자물쇠 활성화
-  → 코어 A키 홀드 처형 → 딜타임
-  → 7초간 코어 집중 공격
-  → 딜타임 종료 → 충격파 → 전투 복귀
-  → 반복
+Boss_Knight                              Layer: Enemy
+│
+├── [BossKnight]                         v1.0
+│     (SO) BossKnightDataSO             * 보스 전용 수치 SO
+│     _phaseManager                     BossPhaseManager 참조
+│     _counterSystem                    BossCounterSystem 참조
+│     _shockwave                        BossShockwave 참조
+│     OnPhaseChanged 이벤트             Phase 전환 시 발행
+│
+├── [BossPhaseManager]                   v1.0
+│     _currentPhase                     현재 Phase (1/2/3)
+│     _phase1HpThreshold = 0.5f         Phase 1→2 전환 HP 임계값
+│     _phase2HpThreshold = 0.0f         Phase 2→3 전환 HP 임계값
+│     HP 0% 도달 시 → HP 100% 회복 + Phase 3 진입
+│
+├── [BossKnightAI]                       v1.0
+│     Phase별 패턴 분기
+│     쿨타임 관리
+│     회피 기동 처리
+│     _allPatternsCooldown 체크 → 회피 기동 발동
+│
+├── [BossCounterSystem]                  v1.0
+│     _isCounterActive (bool)           반격 패턴 중복 방지 플래그
+│     검 무식 / 대타 출동 통합 관리
+│     봉인 투사체 감지 → 상태 판단 → 발동 결정
+│
+├── [BossShockwave]                      v1.0
+│     데미지 없음 / 밀침 전용
+│     Phase 전환 시 / 그로기 회복 시 / 딜타임 종료 시 발동
+│     _shockwaveRadius                  밀침 범위 (DataSO)
+│     _shockwavePower                   밀침 강도 (DataSO)
+│
+├── [BossExecutionHandler]               v1.0
+│     A키 홀드 처형 처리
+│     _holdDuration                     홀드 필요 시간 (DataSO)
+│     그로기 회복 감지 → 처형 강제 중단 + 충격파
+│
+├── [BossCoreLock]                       v1.0
+│     활성 조건: 왼팔 + 오른팔 동시 봉인
+│     딜타임 진입 / 종료 처리
+│     _dilTimeDuration = 7.0f           딜타임 지속 (DataSO)
+│
+├── [EnemyBase]                          v2.0
+│     (SO) BossKnightDataSO
+│     virtual TakeDamage / OnDead
+│
+├── [SealComponent]                      v1.3
+│
+├── [Rigidbody2D]
+│     Gravity Scale = 1
+│     Freeze Rotation Z = ON
+│     Collision Detection = Continuous
+│
+├── [CapsuleCollider2D]                  물리 충돌 본체
+│
+├── [SpriteRenderer]                     보스 본체 스프라이트
+│
+│
+│ ═══════════════════════════════════════
+│ Phase 1 전용 오브젝트
+│ ═══════════════════════════════════════
+│
+├── Shield_Phase1                        Layer: EnemyShield  (Phase 1)
+│     localPosition = (+1.0, 0, 0)      기사 정면
+│     [BossPartComponent]               방패 자물쇠 관리
+│           _partType = Shield
+│           _lockComponent              Lock의 LockComponent
+│     [BoxCollider2D]                   isTrigger=OFF  물리 차단
+│     [SpriteRenderer]                  방패 스프라이트
+│     └── Lock_Shield                   Layer: EnemyLock
+│               [LockComponent]         v2.1
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+│
+│ ═══════════════════════════════════════
+│ Phase 2 전용 오브젝트
+│ ═══════════════════════════════════════
+│
+├── Sword_Phase2                         (Phase 2)
+│     [BossPartComponent]               검 자물쇠 관리
+│           _partType = Sword
+│     [SpriteRenderer]                  검 스프라이트
+│     └── Lock_Sword                    Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+│
+│ ═══════════════════════════════════════
+│ Phase 3 전용 오브젝트
+│ ═══════════════════════════════════════
+│
+├── Sword_L_Phase3                       (Phase 3)
+│     [BossPartComponent]               왼손 검 자물쇠
+│           _partType = SwordL
+│     [SpriteRenderer]
+│     └── Lock_SwordL                   Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+├── Sword_R_Phase3                       (Phase 3)
+│     [BossPartComponent]               오른손 검 자물쇠
+│           _partType = SwordR
+│     [SpriteRenderer]
+│     └── Lock_SwordR                   Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+├── Hand2_L                              (Phase 3) 추가 생성 왼손
+│     [BossPartComponent]               왼손2 자물쇠
+│           _partType = Hand2L
+│     [SpriteRenderer]
+│     └── Lock_Hand2L                   Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+├── Hand2_R                              (Phase 3) 추가 생성 오른손
+│     [BossPartComponent]               오른손2 자물쇠
+│           _partType = Hand2R
+│     [SpriteRenderer]
+│     └── Lock_Hand2R                   Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+│
+│ ═══════════════════════════════════════
+│ 전 Phase 공통 오브젝트
+│ ═══════════════════════════════════════
+│
+├── Arm_L                                왼팔 부위
+│     [BossPartComponent]               왼팔 자물쇠 관리
+│           _partType = ArmL
+│           _affectedPatterns           왼팔 사용 패턴 목록
+│     [SpriteRenderer]                  왼팔 스프라이트
+│     └── Lock_ArmL                     Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+├── Arm_R                                오른팔 부위
+│     [BossPartComponent]               오른팔 자물쇠 관리
+│           _partType = ArmR
+│           _affectedPatterns           오른팔 사용 패턴 목록
+│     [SpriteRenderer]                  오른팔 스프라이트
+│     └── Lock_ArmR                     Layer: EnemyLock
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+├── Core                                 코어 (기본 비활성)
+│     Layer: Enemy
+│     [BossCoreLock]                    활성 조건 감지 + 딜타임 관리
+│     [SpriteRenderer]                  코어 스프라이트 (활성 시 표시)
+│     [CircleCollider2D]                isTrigger=ON  활성 시만 ON
+│     └── Lock_Core                     Layer: EnemyLock (활성 시만)
+│               [LockComponent]
+│               [BoxCollider2D]         isTrigger=ON
+│               [SpriteRenderer]
+│
+│
+│ ═══════════════════════════════════════
+│ 공격 히트박스
+│ ═══════════════════════════════════════
+│
+├── Hitbox_ShieldCharge                  Layer: EnemyAttackHit
+│     [BoxCollider2D]                   isTrigger=ON  방패 돌진 판정
+│
+├── Hitbox_ShieldSlam                    Layer: EnemyAttackHit
+│     [BoxCollider2D]                   isTrigger=ON  방패 밀치기 판정
+│
+├── Hitbox_PunchR                        Layer: EnemyAttackHit
+│     [BoxCollider2D]                   isTrigger=ON  오른팔 주먹 판정
+│
+├── Hitbox_Sword                         Layer: EnemyAttackHit
+│     [BoxCollider2D]                   isTrigger=ON  검 공격 판정
+│
+├── Hitbox_Hand2L                        Layer: EnemyAttackHit  (Phase 3)
+│     [BoxCollider2D]                   isTrigger=ON  왼손2 주먹 판정
+│
+├── Hitbox_Hand2R                        Layer: EnemyAttackHit  (Phase 3)
+│     [BoxCollider2D]                   isTrigger=ON  오른손2 주먹 판정
+│
+│
+│ ═══════════════════════════════════════
+│ 예상 범위 표시
+│ ═══════════════════════════════════════
+│
+├── RangeIndicator_ShieldCharge          Layer: BossRange
+│     [BossRangeIndicator]              Inspector on/off
+│     [SpriteRenderer] or [LineRenderer]
+│
+├── RangeIndicator_PunchR                Layer: BossRange
+│     [BossRangeIndicator]
+│     [SpriteRenderer]
+│
+├── RangeIndicator_SwordSlash            Layer: BossRange
+│     [BossRangeIndicator]
+│     [SpriteRenderer]
+│
+├── RangeIndicator_Advance               Layer: BossRange  (Phase 2)
+│     [BossRangeIndicator]
+│     [LineRenderer]
+│
+├── RangeIndicator_DonutSlash            Layer: BossRange  (Phase 3)
+│     [BossRangeIndicator]
+│     [SpriteRenderer]
+│
+├── RangeIndicator_StraightThrust        Layer: BossRange  (Phase 3)
+│     [BossRangeIndicator]
+│     [LineRenderer]
+│
+│
+│ ═══════════════════════════════════════
+│ 비주얼 / 이펙트
+│ ═══════════════════════════════════════
+│
+├── ShockwaveEffect                      충격파 이펙트
+│     [ParticleSystem]
+│
+├── PhaseTransitionEffect                Phase 전환 이펙트
+│     [ParticleSystem]
+│
+├── SealOverlay                          봉인 오버레이
+│     [SpriteRenderer]
+│     SealComponent._overlayRenderer 연결
+│
+└── ChargeWarningLine                    돌진 예고선
+      [LineRenderer]
 ```
 
 ---
 
-## Phase 3 — 해방된 기사
-
-### 기본 설정
+## BossPartComponent 상태 머신
 
 ```
-HP 범위       : 0% 도달 후 → 100% 회복
-진입 연출     : 방패 버림 + 숨겨진 팔 2개 생성 애니메이션
-무기 변화     : 왼손 검 + 오른손 검 (방패 제거)
-               추가 팔 2개 생성 (왼손2 / 오른손2)
-총 팔 수      : 4개 (왼팔, 오른팔, 왼손2, 오른손2)
-자물쇠 초기화 : Phase 2 해제 상태 전부 초기화
-이동 속도     : 최고속
-공격 타입     : 100% 공격형 (방어 패턴 없음)
-```
-
-### 봉인 패턴 제외 규칙
-
-```
-봉인된 팔 또는 검이 있을 경우
-해당 부위를 사용하는 패턴에서 제외
-
-예시:
-  왼팔 봉인 → 왼팔 사용 패턴 속도/시전 감소
-  왼손2 봉인 → 주먹 돌진 / 횡 잡기에서 왼손2 제외
-  왼손2 + 오른손2 동시 봉인 → 주먹 돌진 / 횡 잡기 패턴 스킵
-```
-
-### 자물쇠 구조
-
-```
-왼손 검 자물쇠 (SwordLLock)
-  위치: 왼손 검
-  해제 시: 검 제식 4 봉인 가능 → 불가 전환
-
-오른손 검 자물쇠 (SwordRLock)
-  위치: 오른손 검
-  해제 시: 검 제식 1 / 검 제식 0 관련 패턴 변화
-
-왼팔 자물쇠 (ArmLLock)
-  위치: 왼팔
-  봉인 중: 왼팔 사용 패턴 속도/시전 느려짐
-  코어 활성 조건에 포함
-
-오른팔 자물쇠 (ArmRLock)
-  위치: 오른팔
-  봉인 중: 오른팔 사용 패턴 속도/시전 느려짐
-  코어 활성 조건에 포함
-
-왼손2 자물쇠 (Hand2LLock)
-  위치: 왼손2 (추가 생성된 팔)
-  봉인 중: 주먹 돌진 / 횡 잡기에서 제외
-
-오른손2 자물쇠 (Hand2RLock)
-  위치: 오른손2 (추가 생성된 팔)
-  봉인 중: 주먹 돌진 / 횡 잡기에서 제외
-
-코어 자물쇠 (CoreLock)
-  기본 상태: 비활성
-  활성 조건: 왼팔 + 오른팔 동시 봉인 (Phase 2와 동일)
-             주먹 팔(왼손2/오른손2) 제외
-  활성 후: A키 홀드 처형 → 딜타임 진입
-```
-
-### 패턴 목록
-
-**1. 검 제식 4 (도넛 원형 베기)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.5초
-  검을 중심으로 원형 범위 표시
-  도넛 모양 (내부 안전구역 표시)
-  봉인 가능 구간
-
-  예고 중 봉인 투사체 감지
-    → 대타 출동 우선 발동
-    → 가용 주먹 없으면 검 무식 + 패턴 일시 중지 → 재개
-
-[시전 중]
-  원형 베기 1회
-  내부 안전구역 히트박스 없음
-  봉인 불가
-
-[후딜레이] 0.6초
-```
-
-**2. 검 제식 0 (연속 4회 확장 베기)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 0.8초
-  1회차 범위 표시 (작은 도넛)
-  봉인 불가 구간
-
-[시전 중]
-  1회 → 범위 확장 → 2회 → 확장 → 3회 → 확장 → 4회
-  각 회차마다 도넛 범위 커짐 (점점 멀어짐)
-  내부 안전구역 유지
-  봉인 불가
-
-[후딜레이] 1.0초
-```
-
-**3. 검 제식 1 (직선 돌진 찌르기)**
-
-```
-[발동 조건]
-  항상 발동 가능
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.2초
-  검을 정면으로 내미는 모션
-  직선 범위 표시
-  봉인 가능 구간
-
-  예고 중 봉인 투사체 감지
-    → 대타 출동 우선 발동
-    → 가용 주먹 없으면 검 무식 + 패턴 일시 중지 → 재개
-
-[시전 중]
-  직선 돌진 + 찌르기
-  돌진 중 봉인 → 그로기 즉시 진입
-
-[후딜레이] 0.5초
-  정상 종료 시
-```
-
-**4. 주먹 돌진**
-
-```
-[발동 조건]
-  왼손2 / 오른손2 중 하나 이상 가용 상태
-  둘 다 봉인 시 패턴 스킵
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.0초
-  발사될 주먹 색상으로 구별 표시
-  봉인 불가 구간
-
-  예고 중 봉인 투사체 감지
-    → 대타 출동만 발동 (검 무식 불가)
-    → 가용 주먹 없으면 봉인 그냥 적중
-
-[시전 중]
-  왼손2 / 오른손2 발사
-  날아오는 중 봉인 성공
-    → 해당 주먹 정지 후 원위치 복귀
-    → 해당 주먹 봉인 상태 적용
-  대타 출동 발동 시 해당 주먹 봉인 적용
-
-[후딜레이] 0.5초
-```
-
-**5. 횡 잡기**
-
-```
-[발동 조건]
-  왼손2 / 오른손2 중 하나 이상 가용 상태
-  둘 다 봉인 시 패턴 스킵
-  쿨타임: DataSO 수정 가능
-
-[예고] 1.0초
-  왼손2 / 오른손2 번갈아 준비
-  어느 손이 먼저인지 색상으로 표시 (매 발동마다 랜덤)
-  봉인 불가 구간
-
-  예고 중 봉인 투사체 감지
-    → 대타 출동만 발동 (검 무식 불가)
-    → 가용 주먹 없으면 봉인 그냥 적중
-
-[시전 중]
-  좌→우 or 우→좌 순서로 휩쓸기 (매 발동마다 랜덤)
-  봉인 성공 (둘 중 하나)
-    → 해당 손 정지
-    → 나머지 손은 계속 진행
-  잡기 성공 시
-    → 플레이어 잡음 → 바닥 내려침 → 던짐
-
-[후딜레이] 0.8초
-```
-
-**6. 검 무식 개**
-
-```
-Phase 2 검 무식과 동일
-쿨타임: 30초 (DataSO 수정 가능)
-초기 쿨타임: 10~15초 유지
-```
-
-**7. 대타 출동**
-
-```
-Phase 2 대타 출동과 동일 구조
-트리거: 패턴 시전 중 봉인 투사체 감지
-가장 가까운 가용 주먹(왼손2/오른손2) 발동
-해당 주먹 봉인 상태 진입
-봉인된 주먹은 _isBeingSealed 플래그 → 대타 출동 대상 제외
-```
-
-### 플레이어 공격 가능 구조
-
-```
-기본 구조
-  각 패턴 후딜레이 구간 → 직접 공격 가능
-  그로기 상태 → 처형 + 자물쇠 공략
-
-딜타임 구조 공략
-  그로기 상태 진입 (패턴 후딜레이 또는 봉인으로 유도)
-  → 왼팔 봉인 (A키 홀드 처형)
-  → 오른팔 봉인 (A키 홀드 처형)
-     (주먹 팔 왼손2/오른손2 제외 — 코어 조건에 불필요)
-  → 코어 자물쇠 활성화
-  → 코어 A키 홀드 처형 → 딜타임
-  → 7초간 코어 집중 공격 (DataSO 수정 가능)
-  → 딜타임 종료 → 충격파 → 전투 복귀
-  → 반복하여 HP 0 → 처치
-
-왼팔 / 오른팔 봉인 효과
-  해당 팔 사용 패턴 속도/시전 시간 느려짐
-  플레이어에게 추가 공략 시간 확보
+[Locked]    자물쇠 있음. 봉인 상태. 피격 누적.
+[Unlocked]  자물쇠 해제. 약점 노출. 재잠금 가능.
+[Broken]    부위 파괴. (추후 확장)
 ```
 
 ---
 
-## DataSO 수정 가능 항목 목록
+## 컴포넌트 연결 체크리스트
 
-```
-Phase 1
-  방패 돌진 쿨타임
-  방어 자세 지속시간 (2.0~4.0초)
-  주먹 공격 쿨타임
-  A키 홀드 처형 시간
-  회피 기동 쿨타임
-
-Phase 2
-  전방 진군 쿨타임
-  전방 돌격 쿨타임
-  검 제식 7 쿨타임
-  검 제식 12 쿨타임
-  검 무식 초기 쿨타임 (10~15초)
-  검 무식 쿨타임 (60초)
-  코어 딜타임 지속시간 (7초)
-
-Phase 3
-  검 제식 4 쿨타임
-  검 제식 0 쿨타임
-  검 제식 1 쿨타임
-  주먹 돌진 쿨타임
-  횡 잡기 쿨타임
-  검 무식 개 쿨타임 (30초)
-  검 무식 개 초기 쿨타임 (10~15초)
-  코어 딜타임 지속시간 (7초)
-
-공통
-  충격파 밀침 거리/속도
-  회피 기동 발동 대기시간
-  예상 범위 표시 on/off (Inspector)
-```
-
----
-
-## 필요한 신규 컴포넌트 목록
-
-| 컴포넌트 | 역할 |
-|---|---|
-| `BossKnight.cs` | 보스 루트. Phase 전환, 자물쇠 초기화, 충격파 |
-| `BossKnightAI.cs` | Phase별 패턴 분기. 쿨타임 관리. 회피 기동 |
-| `BossPhaseManager.cs` | Phase 1→2→3 전환 로직. HP 임계값 처리 |
-| `BossPartComponent.cs` | 각 부위(팔/검/방패). 봉인 상태 + 약점 노출 |
-| `BossCoreLock.cs` | 코어 자물쇠. 활성 조건 + 딜타임 진입 |
-| `BossCounterSystem.cs` | 검 무식 / 대타 출동 통합 관리. _isCounterActive |
-| `BossShockwave.cs` | 충격파 전용. 데미지 없음, 밀침만 |
-| `BossExecutionHandler.cs` | A키 홀드 처형 처리. 자동 이동 + 강제 중단 |
-| `BossPatternBase.cs` | 패턴 추상 클래스. 예고/시전/후딜레이 상태 |
-| `BossRangeIndicator.cs` | 예상 범위 시각화. Inspector on/off |
-| `BossKnightDataSO.cs` | 보스 전용 DataSO. 모든 수치 보관 |
-
----
-
-## 미결 항목
-
-| 항목 | 상태 | 메모 |
+| 컴포넌트 | 필드 | 값 |
 |---|---|---|
-| 검 무식 vs 대타 출동 발동 기준 | ✅ 확정 | 상태표 참고 |
-| A키 홀드 처형 메커니즘 | ✅ 확정 | 그로기 회복 시 강제 중단 + 충격파 |
-| Phase 전환 자물쇠 초기화 | ✅ 확정 | 전부 초기화 |
-| 코어 딜타임 지속시간 | ✅ 7초 | DataSO 수정 가능 |
-| 3Phase 코어 조건 | ✅ 확정 | 왼팔 + 오른팔 2개 (주먹 팔 제외) |
-| 대타 출동 주먹 봉인 | ✅ 확정 | 봉인 적용 + 해당 패턴 시전 불가 |
-| 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
-| 코드 구현 | 🔲 대기 중 | 기획 확정 후 시작 |
-| BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
-| 보스 룸 씬 구성 | 🔲 미착수 | |
+| BossKnight | _settings | BossKnightDataSO.asset |
+| BossKnight | _phaseManager | BossPhaseManager |
+| BossKnight | _counterSystem | BossCounterSystem |
+| BossKnight | _shockwave | BossShockwave |
+| BossCoreLock | _armL | Arm_L의 BossPartComponent |
+| BossCoreLock | _armR | Arm_R의 BossPartComponent |
+| BossCoreLock | _coreLock | Core의 LockComponent |
+| BossCounterSystem | _swordHitbox | Hitbox_Sword |
+| BossCounterSystem | _hand2L | Hand2_L의 BossPartComponent |
+| BossCounterSystem | _hand2R | Hand2_R의 BossPartComponent |
+| BossExecutionHandler | _holdDuration | DataSO 참조 |
+| SealComponent | _overlayRenderer | SealOverlay의 SpriteRenderer |
+
+---
+
+## Phase별 활성화 오브젝트 정리
+
+| 오브젝트 | Phase 1 | Phase 2 | Phase 3 |
+|---|---|---|---|
+| Shield_Phase1 | ✅ | ❌ | ❌ |
+| Sword_Phase2 | ❌ | ✅ | ❌ |
+| Sword_L_Phase3 | ❌ | ❌ | ✅ |
+| Sword_R_Phase3 | ❌ | ❌ | ✅ |
+| Hand2_L | ❌ | ❌ | ✅ |
+| Hand2_R | ❌ | ❌ | ✅ |
+| Arm_L | ✅ | ✅ | ✅ |
+| Arm_R | ✅ | ✅ | ✅ |
+| Core | ❌ | 조건부 | 조건부 |
+| Hitbox_ShieldCharge | ✅ | ❌ | ❌ |
+| Hitbox_PunchR | ✅ | ✅ | ✅ |
+| Hitbox_Sword | ❌ | ✅ | ✅ |
+| Hitbox_Hand2L | ❌ | ❌ | ✅ |
+| Hitbox_Hand2R | ❌ | ❌ | ✅ |
+
+---
+
+## BossKnightDataSO 수치 항목
+
+```
+[기본 정보]
+bossName              : 봉인된 기사
+
+[Phase 1]
+p1ShieldChargeCooldown
+p1DefenseStanceDuration      (2.0~4.0초)
+p1PunchCooldown
+p1MoveSpeed
+
+[Phase 2]
+p2AdvanceCooldown
+p2ChargeCooldown
+p2SwordSlash7Cooldown
+p2SwordSlash12Cooldown
+p2CounterInitialCooldown     (10~15초)
+p2CounterCooldown            (60초)
+p2DilTimeDuration            (7초)
+p2MoveSpeed
+
+[Phase 3]
+p3Slash4Cooldown
+p3Slash0Cooldown
+p3Slash1Cooldown
+p3PunchDashCooldown
+p3GrabCooldown
+p3CounterCooldown            (30초)
+p3CounterInitialCooldown     (10~15초)
+p3DilTimeDuration            (7초)
+p3MoveSpeed
+
+[공통]
+shockwaveRadius
+shockwavePower
+executionHoldDuration        (A키 홀드 시간)
+dodgeCooldown                (회피 기동 쿨타임)
+rangeIndicatorEnabled        (bool — Inspector on/off)
+attackHitLayer               (Player 레이어)
+groundLayer                  (Ground + Wall)
+playerLayer                  (Player)
+```
+
+---
+
+## Physics 2D Matrix 추가 설정
+
+| | Player | PlayerAttackHit | Enemy | EnemyLock | EnemyShield | EnemyAttackHit | BossRange |
+|---|---|---|---|---|---|---|---|
+| **BossRange** | OFF | OFF | OFF | OFF | OFF | OFF | OFF |
+
+BossRange 레이어는 시각화 전용. 모든 충돌 OFF.

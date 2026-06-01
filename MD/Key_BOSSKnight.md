@@ -1,4 +1,4 @@
-# Key_BOSS — 보스 기획 문서
+# Key_BOSSKnight — 봉인된 기사 보스 기획 문서
 
 Unity 버전 6000.3.10f1 | 2D Universal | namespace : KEY
 
