@@ -1626,3 +1626,66 @@ BossPatternBase vs EnemyAttackBase 차이
 | Phase 1 패턴 구현체 3개 (ShieldCharge / DefenseStance / PunchR) | 🔲 미착수 |
 | Phase 2 패턴 구현체 4개 (Advance / Charge / SwordSlash7 / SwordSlash12) | 🔲 미착수 |
 | Phase 3 패턴 구현체 5개 (Slash4 / Slash0 / Slash1 / PunchDash / Grab) | 🔲 미착수 |
+
+---
+
+### v0.27 — 보스 기사형 패턴 구현체 + Prefab 가이드
+
+**완성 파일**
+
+| 파일 | 버전 | 역할 |
+|---|---|---|
+| `BossPattern_ShieldCharge.cs` | v1.0 | Phase 1 방패 돌진 |
+| `BossPattern_DefenseStance.cs` | v1.0 | Phase 1 방어 자세 |
+| `BossPattern_PunchR.cs` | v1.0 | Phase 1 주먹 공격 |
+| `BossPattern_Advance.cs` | v1.0 | Phase 2 전방 진군 (3연속 돌진) |
+| `BossPattern_Charge.cs` | v1.0 | Phase 2 전방 돌격 (긴 돌진) |
+| `BossPattern_SwordSlash7.cs` | v1.0 | Phase 2 검 제식 7 |
+| `BossPattern_SwordSlash12.cs` | v1.0 | Phase 2 검 제식 12 |
+| `BossPattern_SwordSlash4.cs` | v1.0 | Phase 3 검 제식 4 (도넛 원형) |
+| `BossPattern_SwordSlash0.cs` | v1.0 | Phase 3 검 제식 0 (4회 확장) |
+| `BossPattern_SwordSlash1.cs` | v1.0 | Phase 3 검 제식 1 (직선 돌진 찌르기) |
+| `BossPattern_PunchDash.cs` | v1.0 | Phase 3 주먹 돌진 |
+| `BossPattern_Grab.cs` | v1.0 | Phase 3 횡 잡기 |
+| `Boss_Knight_Prefab_Guide.md` | — | Prefab 구성 가이드 (6단계) |
+
+**패치 필요 파일**
+
+| 파일 | 패치 내용 | 참조 |
+|---|---|---|
+| `LockComponent.cs` | `ForceUnlock()` 메서드 추가 | LockComponent_patch.txt |
+| `InputManager.cs` | `IsAttackHeld` 프로퍼티 추가 | InputManager_IsAttackHeld_patch.txt |
+
+**패턴 봉인 반응 요약**
+
+| 패턴 | Warning 봉인 | Active 봉인 | 결과 |
+|---|---|---|---|
+| ShieldCharge | 불가 | 가능 | 그로기 |
+| DefenseStance | 불가 | Guard봉인 감지 | 그로기 |
+| PunchR | 불가 | 불가 | - |
+| Advance | 가능 | 정지 구간 가능 | 그로기 |
+| Charge | 불가 | 불가 | - |
+| SwordSlash7 | 가능 | 불가 | 검 무식 요청 |
+| SwordSlash12 | 불가 | 불가 | - |
+| SwordSlash4 | 가능 | 불가 | 대타 출동 우선 |
+| SwordSlash0 | 불가 | 불가 | - |
+| SwordSlash1 | 가능 | 가능 | 대타 출동 우선 / 그로기 |
+| PunchDash | 불가 | 가능 | 대타 출동 |
+| Grab | 불가 | 가능 | 대타 출동 |
+
+**파일 버전 스냅샷 추가 (v0.27 기준)**
+
+| 파일 | 버전 |
+|---|---|
+| `BossPattern_ShieldCharge.cs` | v1.0 |
+| `BossPattern_DefenseStance.cs` | v1.0 |
+| `BossPattern_PunchR.cs` | v1.0 |
+| `BossPattern_Advance.cs` | v1.0 |
+| `BossPattern_Charge.cs` | v1.0 |
+| `BossPattern_SwordSlash7.cs` | v1.0 |
+| `BossPattern_SwordSlash12.cs` | v1.0 |
+| `BossPattern_SwordSlash4.cs` | v1.0 |
+| `BossPattern_SwordSlash0.cs` | v1.0 |
+| `BossPattern_SwordSlash1.cs` | v1.0 |
+| `BossPattern_PunchDash.cs` | v1.0 |
+| `BossPattern_Grab.cs` | v1.0 |

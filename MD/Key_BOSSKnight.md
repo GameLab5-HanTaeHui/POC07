@@ -831,22 +831,22 @@ Phase 3
 | `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형. 자동 이동 + 강제 중단 |
 | `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화. Inspector on/off |
 
-### 미착수 컴포넌트 (다음 단계)
+### 완료된 패턴 구현체 (v0.27)
 
-| 컴포넌트 | 역할 |
-|---|---|
-| `BossPattern_ShieldCharge.cs` | Phase 1 방패 돌진 |
-| `BossPattern_DefenseStance.cs` | Phase 1 방어 자세 |
-| `BossPattern_PunchR.cs` | Phase 1 주먹 공격 |
-| `BossPattern_Advance.cs` | Phase 2 전방 진군 (3연속 돌진) |
-| `BossPattern_Charge.cs` | Phase 2 전방 돌격 (긴 돌진) |
-| `BossPattern_SwordSlash7.cs` | Phase 2 검 제식 7 |
-| `BossPattern_SwordSlash12.cs` | Phase 2 검 제식 12 |
-| `BossPattern_Slash4.cs` | Phase 3 검 제식 4 |
-| `BossPattern_Slash0.cs` | Phase 3 검 제식 0 |
-| `BossPattern_Slash1.cs` | Phase 3 검 제식 1 |
-| `BossPattern_PunchDash.cs` | Phase 3 주먹 돌진 |
-| `BossPattern_Grab.cs` | Phase 3 횡 잡기 |
+| 컴포넌트 | 버전 | 역할 |
+|---|---|---|
+| `BossPattern_ShieldCharge.cs` | v1.0 | Phase 1 방패 돌진 |
+| `BossPattern_DefenseStance.cs` | v1.0 | Phase 1 방어 자세 |
+| `BossPattern_PunchR.cs` | v1.0 | Phase 1 주먹 공격 |
+| `BossPattern_Advance.cs` | v1.0 | Phase 2 전방 진군 (3연속 돌진) |
+| `BossPattern_Charge.cs` | v1.0 | Phase 2 전방 돌격 (긴 돌진) |
+| `BossPattern_SwordSlash7.cs` | v1.0 | Phase 2 검 제식 7 |
+| `BossPattern_SwordSlash12.cs` | v1.0 | Phase 2 검 제식 12 |
+| `BossPattern_SwordSlash4.cs` | v1.0 | Phase 3 검 제식 4 (도넛 원형) |
+| `BossPattern_SwordSlash0.cs` | v1.0 | Phase 3 검 제식 0 (4회 확장) |
+| `BossPattern_SwordSlash1.cs` | v1.0 | Phase 3 검 제식 1 (직선 돌진 찌르기) |
+| `BossPattern_PunchDash.cs` | v1.0 | Phase 3 주먹 돌진 |
+| `BossPattern_Grab.cs` | v1.0 | Phase 3 횡 잡기 |
 
 ---
 
@@ -871,10 +871,12 @@ Phase 3
 | BossExecutionHandler | ✅ 완료 | v1.0. A키 홀드 처형 |
 | BossRangeIndicator | ✅ 완료 | v1.0. Inspector on/off |
 | BossKnightDataSO | ✅ 완료 | v1.0. Phase별 struct 분리 |
-| Phase 1 패턴 구현체 3개 | 🔲 미착수 | ShieldCharge / DefenseStance / PunchR |
-| Phase 2 패턴 구현체 4개 | 🔲 미착수 | Advance / Charge / SwordSlash7 / SwordSlash12 |
-| Phase 3 패턴 구현체 5개 | 🔲 미착수 | Slash4 / Slash0 / Slash1 / PunchDash / Grab |
+| Phase 1 패턴 구현체 3개 | ✅ 완료 | v0.27 |
+| Phase 2 패턴 구현체 4개 | ✅ 완료 | v0.27 |
+| Phase 3 패턴 구현체 5개 | ✅ 완료 | v0.27 SwordSlash4/0/1 명칭 적용 |
 | BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
+| LockComponent ForceUnlock() 패치 | 🔲 패치 필요 | LockComponent_patch.txt |
+| InputManager IsAttackHeld 패치 | 🔲 패치 필요 | InputManager_IsAttackHeld_patch.txt |
 | 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
-| Boss_Knight Prefab 구성 | 🔲 미착수 | |
+| Boss_Knight Prefab 구성 가이드 | ✅ 완료 | v0.27 Boss_Knight_Prefab_Guide.md |
 | 보스 룸 씬 구성 | 🔲 미착수 | |
