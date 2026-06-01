@@ -209,7 +209,7 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 현재 상태에 맞게 색상 갱신.
+        /// 현재 상태에 맞게 색상 즉시 갱신.
         /// 해제 = 붉은색 / 봉인 = 파란색.
         /// </summary>
         private void RefreshColor()
@@ -219,6 +219,20 @@ namespace KEY
             _spriteRenderer.color = _isUnlocked
                 ? _data.armUnlockedColor
                 : _data.armLockedColor;
+        }
+
+        /// <summary>
+        /// 봉인 상태 색상 복구 (외부 API).
+        /// 패턴 DOTween 연출이 팔 색상을 변경한 뒤
+        /// Recovery 종료 또는 Interrupt 후 호출하여 봉인 색상으로 복구.
+        ///
+        /// [호출처]
+        ///   TestBossPattern_PunchDown — OnRecovery 완료 / Interrupt 후
+        ///   TestBossPattern_PunchShot — OnRecovery 완료 / Interrupt 후
+        /// </summary>
+        public void RestoreArmColor()
+        {
+            RefreshColor();
         }
 
         // ══════════════════════════════════════════════════════
