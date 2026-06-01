@@ -228,6 +228,13 @@ namespace KEY
         /// </summary>
         public event Action<float> OnFlipped;
 
+        /// <summary>
+        /// 상태 전환 시 발행.
+        /// TestBossFeedback 이 구독하여 상태별 DOTween 연출 시작.
+        /// 파라미터: (새 상태, 현재 실행 중인 패턴 — null 가능)
+        /// </summary>
+        public event Action<TestBossAIState, TestBossPatternBase> OnStateChanged;
+
         // ──────────────────────────────────────────
         // 프로퍼티
         // ──────────────────────────────────────────
@@ -697,6 +704,9 @@ namespace KEY
             if (_currentState == newState) return;
             _currentState = newState;
             Debug.Log($"[TestBossAI] 상태 전환 → {newState}");
+
+            // 상태 전환 이벤트 발행 → TestBossFeedback 연출 시작
+            OnStateChanged?.Invoke(_currentState, _currentPattern);
         }
 
         // ══════════════════════════════════════════════════════

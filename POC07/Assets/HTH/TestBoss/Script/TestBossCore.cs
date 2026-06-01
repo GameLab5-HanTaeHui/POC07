@@ -201,6 +201,12 @@ namespace KEY
         /// <summary> 보스 처치 시 발행. </summary>
         public event Action OnDead;
 
+        /// <summary>
+        /// 딜타임 중 피격 시 발행.
+        /// TestBossFeedback 이 구독하여 흰색 플래시 + 흔들림 연출.
+        /// </summary>
+        public event Action OnHitFeedback;
+
         // ──────────────────────────────────────────
         // 프로퍼티
         // ──────────────────────────────────────────
@@ -349,6 +355,9 @@ namespace KEY
             // iFrame
             if (_iFrameCoroutine != null) StopCoroutine(_iFrameCoroutine);
             _iFrameCoroutine = StartCoroutine(IFrameRoutine());
+
+            // 피격 피드백 이벤트 발행 → TestBossFeedback 흰색 플래시
+            OnHitFeedback?.Invoke();
 
             Debug.Log($"[TestBossCore] 딜타임 피격: -{info.Amount:F0} / HP {_currentHp:F0}/{MaxHp:F0}");
 

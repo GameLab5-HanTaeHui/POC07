@@ -81,7 +81,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -265,6 +265,7 @@ GameObject:
   - component: {fileID: 1802265748410754449}
   - component: {fileID: 2305401549654009775}
   - component: {fileID: 1428830662360480358}
+  - component: {fileID: 5724810485760124141}
   m_Layer: 15
   m_Name: TestBoss
   m_TagString: Untagged
@@ -489,6 +490,40 @@ MonoBehaviour:
   _triggerKey: 20
   _groogyDurationOverride: 0
   _dilTimeTriggerKey: 21
+--- !u!114 &5724810485760124141
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d377f1aa33d37148a1f32c24229883c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossFeedback
+  _bodyRenderer: {fileID: 2249690153614393268}
+  _coreRenderer: {fileID: 9216639898491200685}
+  _chargePattern: {fileID: 4172355998015639636}
+  _stompPattern: {fileID: 6366365058214617951}
+  _chargeWarnShakeStrength: 0.2
+  _chargeWarnShakePeriod: 0.18
+  _chargeWarnColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+  _stompWarnExpandY: 0.18
+  _stompWarnColor: {r: 0.7, g: 0.2, b: 1, a: 1}
+  _chargeActiveScaleX: 0.2
+  _stompActivePunch: 0.45
+  _groggyPulsePeriod: 0.55
+  _groggySquishY: 0.1
+  _groggyColor: {r: 1, g: 0.95, b: 0.2, a: 1}
+  _dilTimePulsePeriod: 0.28
+  _dilTimeColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+  _corePulsePeriod: 0.15
+  _recoveryShakeStrength: 0.08
+  _recoveryShakeDuration: 0.4
+  _hitFlashDuration: 0.1
+  _hitShakeStrength: 0.15
+  _deathShrinkDuration: 0.5
 --- !u!1 &4689039438399731876
 GameObject:
   m_ObjectHideFlags: 0
