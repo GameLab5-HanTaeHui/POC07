@@ -1,34 +1,31 @@
 ﻿// ============================================================
-// TestBossShockwave.cs  v1.2
+// TestBossShockwave.cs  v1.3
 // 테스트 보스 전용 충격파 컴포넌트
 //
-// [v1.2 변경 — 넉백 미적용 문제 수정]
+// [v1.3 변경 — 수평 넉백 덮어씌워지는 문제 수정]
 //
-//   [문제 1 — velocity 설정 전 Block 미보장]
-//     기존: Trigger() 에서 velocity 설정 후 코루틴으로 Block 시작
-//     → 코루틴의 첫 yield 전까지는 동기지만,
-//       velocity 설정과 같은 프레임에 PlayerMover.FixedUpdate 가 실행되면
-//       velocity 를 덮어씀.
-//     수정: velocity 설정 전 BlockMove/Jump/Dash 즉시 동기 호출
-//           → velocity 설정
-//           → 코루틴으로 일정 시간 후 Unblock
+//   [문제]
+//     BlockMove() 를 동기 호출 후 velocity 설정해도
+//     같은 프레임 내에서 PlayerMover.ApplyMovement() 가
+//     FixedUpdate 에서 velocity.x 를 덮어씀.
+//     → 수직(Y)은 PlayerMover 가 건드리지 않아서 upwardForce 는 적용됨.
+//     → 수평(X)은 덮어씌워져 넉백 없이 위로만 솟아오름.
 //
-//   [문제 2 — Rigidbody2D/위치 탐색 오류]
-//     기존: col.TryGetComponent<Rigidbody2D>()
-//     → col 이 플레이어 자식 Collider 이면 루트 Rigidbody2D 탐색 실패
-//     → 방향 계산도 col.transform.position 기준이라 엉뚱한 방향
-//     수정: col.GetComponentInParent<Rigidbody2D>()
-//           방향 계산도 rb.transform.position (루트 위치) 기준
+//   [수정]
+//     Trigger() 에서 코루틴 시작.
+//     코루틴 내부에서:
+//       1. Block 즉시
+//       2. WaitForFixedUpdate() — 다음 FixedUpdate 까지 대기
+//          → PlayerMover 가 이번 프레임 velocity 덮어쓰기 완료 후
+//       3. velocity 설정 (수평 + 수직 동시)
+//          → 이후 PlayerMover 는 Block 상태라 velocity.x 안 건드림
+//       4. WaitForSecondsRealtime(blockDuration) — 날아가는 동안 차단 유지
+//       5. Unblock
 //
-//   [문제 3 — 상방 bias 계산]
-//     기존: Vector2.Lerp(horizontal, Vector2.up, _upwardBias).normalized
-//     → Lerp 후 normalized 는 의도한 방향을 유지하지만
-//       horizontal 이 순수 수평이면 Lerp 결과에 Y 성분이 섞임.
-//       실제로는 정상이나 위치 오류로 horizontal Y 가 -0.01 로 계산됨.
-//     수정: horizontal 을 (x, 0) 으로 강제하여 Y 오염 제거
-//           + _upwardBias 를 Y 에 직접 더하는 방식으로 변경
-//           finalDir = normalize(horizontal.x, _upwardBias * shockwavePower)
-//           → 상방 성분이 명시적으로 보장됨
+// [수평 + 수직 분리 설계]
+//   수평: 보스 → 플레이어 방향 * _shockwavePower  (뒤로 날아가는 힘)
+//   수직: _upwardForce  (위로 튀어오르는 힘)
+//   결과: 대각선으로 날아가는 느낌
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -41,25 +38,21 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 테스트 보스 전용 충격파 컴포넌트. (v1.2)
+    /// 테스트 보스 전용 충격파 컴포넌트. (v1.3)
     /// </summary>
     public class TestBossShockwave : MonoBehaviour
     {
         [Header("── 충격파 수치 ──────────────────────")]
+
         [Tooltip("충격파 감지 반경 (units). 권장: 6~12.")]
         [Min(0.5f)]
         [SerializeField] private float _shockwaveRadius = 8f;
 
-        [Tooltip("충격파 수평 밀침 강도. 권장: 15~25.")]
+        [Tooltip("수평 밀침 강도 (뒤로 날아가는 힘). 권장: 15~25.")]
         [Min(0f)]
         [SerializeField] private float _shockwavePower = 20f;
 
-        /// <summary>
-        /// 상방 튀어오르는 힘 (별도 Y축 velocity).
-        /// 수평 밀침과 독립적으로 Y velocity 에 더함.
-        /// 권장: 8~15. 클수록 위로 높이 날아감.
-        /// </summary>
-        [Tooltip("상방 튀어오르는 힘 (Y velocity). 권장: 8~15.")]
+        [Tooltip("수직 튀어오르는 힘 (위로 솟는 힘). 권장: 8~15.")]
         [Min(0f)]
         [SerializeField] private float _upwardForce = 10f;
 
@@ -107,22 +100,17 @@ namespace KEY
         /// <summary>
         /// 충격파 발동.
         /// TestBossCore.ExitDilTime() 에서 호출.
-        ///
-        /// [v1.2 수정 — velocity 설정 보장 순서]
-        ///   1. Block 즉시 동기 호출 (velocity 덮어쓰기 차단)
-        ///   2. velocity 설정
-        ///   3. 코루틴으로 blockDuration 후 Unblock
         /// </summary>
         public void Trigger(Vector3 origin)
         {
-            // 1. 파티클
+            // 파티클
             if (_shockwaveEffect != null)
             {
                 _shockwaveEffect.transform.position = origin;
                 _shockwaveEffect.Play();
             }
 
-            // 2. 카메라 셰이크
+            // 카메라 셰이크
             if (_cameraTransform != null && _cameraShakeStrength > 0f)
             {
                 _cameraTransform.DOKill();
@@ -133,14 +121,14 @@ namespace KEY
                     randomness: 90f);
             }
 
-            // 3. 히트스탑
+            // 히트스탑
             if (_hitStopDuration > 0f)
             {
                 if (_hitStopCoroutine != null) StopCoroutine(_hitStopCoroutine);
                 _hitStopCoroutine = StartCoroutine(HitStopRoutine());
             }
 
-            // 4. 플레이어 밀침
+            // 플레이어 감지 → 코루틴으로 넉백 처리
             int count = Physics2D.OverlapCircleNonAlloc(
                 origin, _shockwaveRadius, _overlapBuffer, _playerLayer);
 
@@ -149,31 +137,15 @@ namespace KEY
                 Collider2D col = _overlapBuffer[i];
                 if (col == null) continue;
 
-                // ★ v1.2: GetComponentInParent — 자식 Collider 여도 루트 Rigidbody2D 탐색
                 Rigidbody2D rb = col.GetComponentInParent<Rigidbody2D>();
                 if (rb == null) continue;
 
-                // ★ v1.2: 이동 입력 즉시 차단 (velocity 설정 전에 먼저)
-                InputManager.Instance?.BlockMove();
-                InputManager.Instance?.BlockJump();
-                InputManager.Instance?.BlockDash();
-
-                // ★ v1.2: 수평 방향은 순수 X축으로 강제 (Y 오염 제거)
-                //   rb.position 기준 → 루트 위치로 방향 계산
+                // 수평 방향: 보스 → 플레이어 (순수 X축)
                 float dx = rb.position.x - (float)origin.x;
                 float horizontalSign = dx >= 0f ? 1f : -1f;
 
-                // 수평 + 상방 별도 설정
-                // linearVelocity.x = 수평 밀침
-                // linearVelocity.y = 상방 힘 (튀어오르는 느낌)
-                rb.linearVelocity = new Vector2(
-                    horizontalSign * _shockwavePower,
-                    _upwardForce);
-
-                Debug.Log($"[TestBossShockwave] 밀침 → 수평:{horizontalSign * _shockwavePower:F1} 상방:{_upwardForce:F1}");
-
-                // ★ v1.2: 코루틴으로 Unblock (WaitForSecondsRealtime — timeScale 무관)
-                StartCoroutine(UnblockAfterRealtime(_blockDuration));
+                // ★ 코루틴으로 처리 — WaitForFixedUpdate 후 velocity 설정
+                StartCoroutine(ApplyShockwaveRoutine(rb, horizontalSign));
             }
         }
 
@@ -182,13 +154,43 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// 실시간 duration 후 이동 입력 해제.
-        /// WaitForSecondsRealtime → timeScale 영향 없음.
+        /// 충격파 넉백 코루틴.
+        ///
+        /// [순서]
+        ///   1. Block 즉시 — PlayerMover 입력 차단
+        ///   2. WaitForFixedUpdate — 현재 프레임 PlayerMover.FixedUpdate 완료 대기
+        ///   3. velocity 설정 — Block 상태이므로 PlayerMover 덮어쓰기 없음
+        ///      수평: horizontalSign * _shockwavePower (뒤로 날아가는 힘)
+        ///      수직: _upwardForce (대각선 날아가는 느낌)
+        ///   4. WaitForSecondsRealtime(blockDuration) — 날아가는 동안 차단 유지
+        ///   5. Unblock
         /// </summary>
-        private IEnumerator UnblockAfterRealtime(float duration)
+        private IEnumerator ApplyShockwaveRoutine(Rigidbody2D rb, float horizontalSign)
         {
-            yield return new WaitForSecondsRealtime(duration);
+            // ① 즉시 Block
+            InputManager.Instance?.BlockMove();
+            InputManager.Instance?.BlockJump();
+            InputManager.Instance?.BlockDash();
 
+            // ② 다음 FixedUpdate 까지 대기
+            //    → 이 프레임 PlayerMover.ApplyMovement() 가 먼저 실행되고
+            //    → 다음 프레임부터 Block 상태이므로 velocity 덮어쓰기 없음
+            yield return new WaitForFixedUpdate();
+
+            // ③ velocity 설정 (수평 + 수직 동시)
+            if (rb != null)
+            {
+                rb.linearVelocity = new Vector2(
+                    horizontalSign * _shockwavePower,  // 뒤로 날아가는 수평 힘
+                    _upwardForce);                      // 대각선 느낌의 수직 힘
+
+                Debug.Log($"[TestBossShockwave] 넉백 적용 → X:{horizontalSign * _shockwavePower:F1} Y:{_upwardForce:F1}");
+            }
+
+            // ④ 날아가는 동안 차단 유지 (실시간 — timeScale 무관)
+            yield return new WaitForSecondsRealtime(_blockDuration);
+
+            // ⑤ Unblock
             InputManager.Instance?.UnblockMove();
             InputManager.Instance?.UnblockJump();
             InputManager.Instance?.UnblockDash();
@@ -196,6 +198,7 @@ namespace KEY
 
         /// <summary>
         /// 히트스탑 코루틴.
+        /// WaitForSecondsRealtime: timeScale 영향 없음.
         /// </summary>
         private IEnumerator HitStopRoutine()
         {
