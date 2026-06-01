@@ -1,5 +1,7 @@
 # Key_BOSSHierarchy — 보스 기사 오브젝트 배치도
 
+최신 버전 기준: v0.26 (핵심 컴포넌트 구현 완료)
+
 Unity 버전 6000.3.10f1 | 2D Universal | namespace : KEY
 
 ---
@@ -270,28 +272,115 @@ Boss_Knight                              Layer: Enemy
 
 ```
 [Locked]    자물쇠 있음. 봉인 상태. 피격 누적.
+            팔 봉인 시 _affectedPatterns 에 _sealedSpeedMultiplier 적용.
 [Unlocked]  자물쇠 해제. 약점 노출. 재잠금 가능.
+            팔 해제 시 패턴 속도 배율 1.0 으로 복귀.
 [Broken]    부위 파괴. (추후 확장)
+```
+
+## BossKnightAI 상태 다이어그램
+
+```
+Idle ──(패턴 선택)──────────→ Warning → Active → Recovery → Idle
+Idle ──(전 패턴 쿨타임)───────→ Dodge → Idle
+Warning ──(봉인 성공 가능)───→ Groggy
+Active ──(봉인 성공)─────────→ Groggy
+Groggy ──(groggyDuration)───→ Idle
+DilTime ──(dilTimeDuration)──→ 충격파 → Idle
+Counter ──(완료)─────────────→ 이전 상태 복귀
+PhaseTransition ──(완료)─────→ Idle
+
+봉인 투사체 감지 → BossCounterSystem.TryCounter()
+  그로기 / 딜타임 / PhaseTransition → 반격 불가
+  전투 대기 / Warning → 검 무식 (Phase 1/2)
+  시전 중 / Warning Phase 3 검 패턴 → 대타 출동 우선
+  시전 중 / Warning Phase 3 주먹 패턴 → 대타 출동만
+```
+
+## BossPatternBase 생애주기
+
+```
+Warning 단계
+  ShowRangeIndicator(true)
+  OnWarning() 추상 구현 실행
+  WaitScaled(duration) — _speedMultiplier 적용
+  ShowRangeIndicator(false)
+
+Active 단계
+  OnActive() 추상 구현 실행
+  봉인 감지 → OnSealHit() → BossPatternSealResult 반환
+  TriggerGroggy() → OnPatternGroggy 이벤트 → BossKnightAI.EnterGroggy()
+
+Recovery 단계
+  OnRecovery() 추상 구현 실행
+  StartCooldown() → 쿨타임 시작
+  OnPatternEnd 이벤트 발행
+
+제어 API
+  Pause()     : 검 무식 중 일시 정지
+  Resume()    : 검 무식 완료 후 재개
+  Interrupt() : 그로기/Phase 전환 시 강제 중단
 ```
 
 ---
 
 ## 컴포넌트 연결 체크리스트
 
-| 컴포넌트 | 필드 | 값 |
+### BossKnight (루트)
+
+| 필드 | 값 | 비고 |
 |---|---|---|
-| BossKnight | _settings | BossKnightDataSO.asset |
-| BossKnight | _phaseManager | BossPhaseManager |
-| BossKnight | _counterSystem | BossCounterSystem |
-| BossKnight | _shockwave | BossShockwave |
-| BossCoreLock | _armL | Arm_L의 BossPartComponent |
-| BossCoreLock | _armR | Arm_R의 BossPartComponent |
-| BossCoreLock | _coreLock | Core의 LockComponent |
-| BossCounterSystem | _swordHitbox | Hitbox_Sword |
-| BossCounterSystem | _hand2L | Hand2_L의 BossPartComponent |
-| BossCounterSystem | _hand2R | Hand2_R의 BossPartComponent |
-| BossExecutionHandler | _holdDuration | DataSO 참조 |
-| SealComponent | _overlayRenderer | SealOverlay의 SpriteRenderer |
+| `_bossData` | BossKnightDataSO.asset | ★ 유일한 DataSO 연결 지점 |
+| `_allParts` | 전체 BossPartComponent 목록 | Phase 전환 시 전부 초기화 |
+| `_phase1Patterns` | Phase 1 패턴 목록 | |
+| `_phase2Patterns` | Phase 2 패턴 목록 | |
+| `_phase3Patterns` | Phase 3 패턴 목록 | |
+| `_phase1Objects` | Phase 1 전용 오브젝트 | Shield_Phase1 등 |
+| `_phase2Objects` | Phase 2 전용 오브젝트 | Sword_Phase2 등 |
+| `_phase3Objects` | Phase 3 전용 오브젝트 | Sword_L·R, Hand2_L·R 등 |
+
+### BossCoreLock
+
+| 필드 | 값 |
+|---|---|
+| `_coreObject` | Core GameObject |
+| `_coreLockComponent` | Core의 LockComponent |
+| `_coreCollider` | Core의 Collider2D |
+| `_activateEffect` | 코어 활성 ParticleSystem |
+
+### BossCounterSystem
+
+| 필드 | 값 |
+|---|---|
+| `_interceptHands` | Hand2_L / Hand2_R의 BossPartComponent 목록 |
+| `_parryEffect` | 검 무식 ParticleSystem |
+| `_rearDetectThreshold` | -0.2 (후방 판단 dot product 임계값) |
+| `_rearTurnDelay` | 0.2초 (후방 감지 시 회전 딜레이) |
+
+### BossExecutionHandler
+
+| 필드 | 값 |
+|---|---|
+| `_executionEffect` | 처형 완료 ParticleSystem |
+| `_executionProgressEffect` | 처형 진행 루프 ParticleSystem |
+
+### BossPartComponent (각 부위)
+
+| 필드 | 값 |
+|---|---|
+| `_partType` | BossPartType enum 선택 |
+| `_activePhases` | 활성화될 Phase 목록 |
+| `_lockComponent` | 자식의 LockComponent (미연결 시 자동 탐색) |
+| `_lockCollider` | 자물쇠 Collider2D |
+| `_affectedPatterns` | 봉인 시 속도 영향받는 패턴 목록 |
+| `_sealedSpeedMultiplier` | 1.5 (봉인 시 패턴 속도 배율) |
+| `_executionRangeOverride` | 0 = DataSO 기본값 사용 |
+
+### SealComponent
+
+| 필드 | 값 |
+|---|---|
+| `_overlayRenderer` | SealOverlay의 SpriteRenderer |
 
 ---
 

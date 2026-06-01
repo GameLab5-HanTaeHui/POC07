@@ -1431,7 +1431,7 @@ Z축 강도 = 0 강제 (2D 사이드뷰 전후 이동 방지)
 Combo3 → Heavy / AirDown → Medium
 ```
 
-**파일 버전 스냅샷 (v0.24 기준 — 실제 프로젝트 최신)**
+**파일 버전 스냅샷 (v0.26 기준 — 실제 프로젝트 최신)**
 
 | 파일 | 버전 | 비고 |
 |---|---|---|
@@ -1464,6 +1464,18 @@ Combo3 → Heavy / AirDown → Medium
 | `LockComponent.cs` | v2.1 | |
 | `HitFeedback.cs` | v2.0 | |
 | ~~`AirAttackDirection.cs`~~ | — | 프로젝트에서 `PlayerAirAttackDirection.cs` 로 명칭 적용 |
+| `BossPhase.cs` | v1.0 | BossPhase/BossPartType/BossPatternSealResult enum |
+| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO |
+| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스 |
+| `BossKnightAI.cs` | v1.0 | 보스 전용 AI |
+| `BossKnight.cs` | v1.0 | 보스 루트 |
+| `BossPhaseManager.cs` | v1.0 | Phase 전환 관리 |
+| `BossPartComponent.cs` | v1.0 | 부위별 봉인 상태 |
+| `BossCoreLock.cs` | v1.0 | 코어 활성/딜타임 |
+| `BossCounterSystem.cs` | v1.0 | 검 무식/대타 출동 |
+| `BossShockwave.cs` | v1.0 | 충격파 |
+| `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형 |
+| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화 |
 
 
 ---
@@ -1590,13 +1602,27 @@ BossPatternBase vs EnemyAttackBase 차이
   → 플레이어 공략 시간 자동 확보
 ```
 
-**미결 컴포넌트 (다음 단계)**
+**완성된 컴포넌트 전체 목록 (v0.26)**
 
-| 컴포넌트 | 상태 |
+| 파일 | 버전 | 역할 |
+|---|---|---|
+| `BossPhase.cs` | v1.0 | 열거형 모음 (BossPhase / BossPartType / BossPatternSealResult) |
+| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO. Phase별 struct 분리 |
+| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery 3단계. Pause/Resume/Interrupt |
+| `BossKnightAI.cs` | v1.0 | 보스 전용 AI. 10상태 + 회피기동 + Counter |
+| `BossKnight.cs` | v1.0 | 보스 루트. Phase전환 + 무적 + TakeDamage override |
+| `BossPhaseManager.cs` | v1.0 | HP 임계값 감시 + Phase 전환 실행 |
+| `BossPartComponent.cs` | v1.0 | 부위별 봉인 상태 + 패턴 속도 배율 |
+| `BossCoreLock.cs` | v1.0 | 코어 활성 조건 + 딜타임 관리 |
+| `BossCounterSystem.cs` | v1.0 | 검 무식/대타 출동 통합. _isCounterActive |
+| `BossShockwave.cs` | v1.0 | 충격파 전용. 데미지 없음 밀침만 |
+| `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형 처리 |
+| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화. Inspector on/off |
+
+**미완성 (다음 단계)**
+
+| 항목 | 상태 |
 |---|---|
-| `BossCoreLock.cs` | 🔲 미착수 |
-| `BossCounterSystem.cs` | 🔲 미착수 |
-| `BossShockwave.cs` | 🔲 미착수 |
-| `BossExecutionHandler.cs` | 🔲 미착수 |
-| `BossRangeIndicator.cs` | 🔲 미착수 |
-| Phase별 패턴 구현체 12개 | 🔲 미착수 |
+| Phase 1 패턴 구현체 3개 (ShieldCharge / DefenseStance / PunchR) | 🔲 미착수 |
+| Phase 2 패턴 구현체 4개 (Advance / Charge / SwordSlash7 / SwordSlash12) | 🔲 미착수 |
+| Phase 3 패턴 구현체 5개 (Slash4 / Slash0 / Slash1 / PunchDash / Grab) | 🔲 미착수 |

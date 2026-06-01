@@ -812,21 +812,41 @@ Phase 3
 
 ---
 
-## 필요한 신규 컴포넌트 목록
+## 컴포넌트 구현 현황
+
+### 완료된 컴포넌트 (v0.26)
+
+| 컴포넌트 | 버전 | 역할 |
+|---|---|---|
+| `BossPhase.cs` | v1.0 | 열거형 모음 (BossPhase / BossPartType / BossPatternSealResult) |
+| `BossKnightDataSO.cs` | v1.0 | 보스 전용 수치 SO. Phase별 struct 분리 |
+| `BossPatternBase.cs` | v1.0 | 패턴 추상 베이스. Warning/Active/Recovery + Pause/Resume/Interrupt |
+| `BossKnightAI.cs` | v1.0 | 보스 전용 AI. 10상태 + 회피기동 + Counter |
+| `BossKnight.cs` | v1.0 | 보스 루트. Phase전환 + 무적 + TakeDamage override |
+| `BossPhaseManager.cs` | v1.0 | HP 임계값 감시 + Phase 전환 실행 |
+| `BossPartComponent.cs` | v1.0 | 부위별 봉인 상태 + 패턴 속도 배율 (_speedMultiplier) |
+| `BossCoreLock.cs` | v1.0 | 코어 활성 조건 + 딜타임 관리 |
+| `BossCounterSystem.cs` | v1.0 | 검 무식/대타 출동 통합. _isCounterActive |
+| `BossShockwave.cs` | v1.0 | 충격파 전용. 데미지 없음 밀침만 |
+| `BossExecutionHandler.cs` | v1.0 | A키 홀드 처형. 자동 이동 + 강제 중단 |
+| `BossRangeIndicator.cs` | v1.0 | 예상 범위 시각화. Inspector on/off |
+
+### 미착수 컴포넌트 (다음 단계)
 
 | 컴포넌트 | 역할 |
 |---|---|
-| `BossKnight.cs` | 보스 루트. Phase 전환, 자물쇠 초기화, 충격파 |
-| `BossKnightAI.cs` | Phase별 패턴 분기. 쿨타임 관리. 회피 기동 |
-| `BossPhaseManager.cs` | Phase 1→2→3 전환 로직. HP 임계값 처리 |
-| `BossPartComponent.cs` | 각 부위(팔/검/방패). 봉인 상태 + 약점 노출 |
-| `BossCoreLock.cs` | 코어 자물쇠. 활성 조건 + 딜타임 진입 |
-| `BossCounterSystem.cs` | 검 무식 / 대타 출동 통합 관리. _isCounterActive |
-| `BossShockwave.cs` | 충격파 전용. 데미지 없음, 밀침만 |
-| `BossExecutionHandler.cs` | A키 홀드 처형 처리. 자동 이동 + 강제 중단 |
-| `BossPatternBase.cs` | 패턴 추상 클래스. 예고/시전/후딜레이 상태 |
-| `BossRangeIndicator.cs` | 예상 범위 시각화. Inspector on/off |
-| `BossKnightDataSO.cs` | 보스 전용 DataSO. 모든 수치 보관 |
+| `BossPattern_ShieldCharge.cs` | Phase 1 방패 돌진 |
+| `BossPattern_DefenseStance.cs` | Phase 1 방어 자세 |
+| `BossPattern_PunchR.cs` | Phase 1 주먹 공격 |
+| `BossPattern_Advance.cs` | Phase 2 전방 진군 (3연속 돌진) |
+| `BossPattern_Charge.cs` | Phase 2 전방 돌격 (긴 돌진) |
+| `BossPattern_SwordSlash7.cs` | Phase 2 검 제식 7 |
+| `BossPattern_SwordSlash12.cs` | Phase 2 검 제식 12 |
+| `BossPattern_Slash4.cs` | Phase 3 검 제식 4 |
+| `BossPattern_Slash0.cs` | Phase 3 검 제식 0 |
+| `BossPattern_Slash1.cs` | Phase 3 검 제식 1 |
+| `BossPattern_PunchDash.cs` | Phase 3 주먹 돌진 |
+| `BossPattern_Grab.cs` | Phase 3 횡 잡기 |
 
 ---
 
@@ -840,7 +860,21 @@ Phase 3
 | 코어 딜타임 지속시간 | ✅ 7초 | DataSO 수정 가능 |
 | 3Phase 코어 조건 | ✅ 확정 | 왼팔 + 오른팔 2개 (주먹 팔 제외) |
 | 대타 출동 주먹 봉인 | ✅ 확정 | 봉인 적용 + 해당 패턴 시전 불가 |
-| 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
-| 코드 구현 | 🔲 대기 중 | 기획 확정 후 시작 |
+| BossPatternBase 추상 베이스 | ✅ 완료 | v1.0. Warning/Active/Recovery 3단계 |
+| BossKnightAI 보스 전용 AI | ✅ 완료 | v1.0. 10상태 + 회피기동 + Counter |
+| BossKnight 루트 컴포넌트 | ✅ 완료 | v1.0. Phase전환 + 무적 + TakeDamage |
+| BossPhaseManager | ✅ 완료 | v1.0. HP 임계값 감시 |
+| BossPartComponent | ✅ 완료 | v1.0. 부위별 봉인 + 패턴 속도 배율 |
+| BossCoreLock | ✅ 완료 | v1.0. 코어 활성 조건 + 딜타임 |
+| BossCounterSystem | ✅ 완료 | v1.0. 검 무식/대타 출동 통합 |
+| BossShockwave | ✅ 완료 | v1.0. 밀침 전용 |
+| BossExecutionHandler | ✅ 완료 | v1.0. A키 홀드 처형 |
+| BossRangeIndicator | ✅ 완료 | v1.0. Inspector on/off |
+| BossKnightDataSO | ✅ 완료 | v1.0. Phase별 struct 분리 |
+| Phase 1 패턴 구현체 3개 | 🔲 미착수 | ShieldCharge / DefenseStance / PunchR |
+| Phase 2 패턴 구현체 4개 | 🔲 미착수 | Advance / Charge / SwordSlash7 / SwordSlash12 |
+| Phase 3 패턴 구현체 5개 | 🔲 미착수 | Slash4 / Slash0 / Slash1 / PunchDash / Grab |
 | BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
+| 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
+| Boss_Knight Prefab 구성 | 🔲 미착수 | |
 | 보스 룸 씬 구성 | 🔲 미착수 | |
