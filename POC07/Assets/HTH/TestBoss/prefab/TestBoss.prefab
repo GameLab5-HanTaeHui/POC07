@@ -10,7 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 3727701608777306926}
   - component: {fileID: 9216639898491200685}
-  m_Layer: 0
+  - component: {fileID: 979828286523835681}
+  - component: {fileID: 3956382126146075975}
+  m_Layer: 15
   m_Name: Core
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -91,6 +93,55 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!58 &979828286523835681
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 144895318575177576}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.5
+--- !u!114 &3956382126146075975
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 144895318575177576}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea02c835d822954409b599e14e64d3a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TestBossCoreHitbox
+  _core: {fileID: 2305401549654009775}
 --- !u!1 &366158322292190033
 GameObject:
   m_ObjectHideFlags: 0
@@ -101,6 +152,7 @@ GameObject:
   m_Component:
   - component: {fileID: 13215985704595696}
   - component: {fileID: 6244242973770741121}
+  - component: {fileID: 2820081174954800102}
   m_Layer: 0
   m_Name: Arm_L
   m_TagString: Untagged
@@ -183,6 +235,21 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!114 &2820081174954800102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366158322292190033}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e6302463f7c8e248907d691a04248ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossArmPart
+  _partType: 0
+  _spriteRenderer: {fileID: 6244242973770741121}
+  _executionRangeOverride: 0
 --- !u!1 &367935668262967058
 GameObject:
   m_ObjectHideFlags: 0
@@ -193,7 +260,12 @@ GameObject:
   m_Component:
   - component: {fileID: 7976710303748699603}
   - component: {fileID: 2249690153614393268}
-  m_Layer: 0
+  - component: {fileID: 6548908103895781547}
+  - component: {fileID: 1889015136676646889}
+  - component: {fileID: 1802265748410754449}
+  - component: {fileID: 2305401549654009775}
+  - component: {fileID: 1428830662360480358}
+  m_Layer: 15
   m_Name: TestBoss
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -277,6 +349,125 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!61 &6548908103895781547
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 2.2, y: 4.6}
+    newSize: {x: 0.22, y: 0.46}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 2.2, y: 4.6}
+  m_EdgeRadius: 0
+--- !u!50 &1889015136676646889
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 1
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 4
+--- !u!114 &1802265748410754449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aefedd487b8069d42b2dc6203ee49719, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossExecution
+--- !u!114 &2305401549654009775
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f174d045e2dad7847947a692dd8b6542, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossCore
+  _data: {fileID: 11400000, guid: c3cb3e914f37fcf418895e2554c602c8, type: 2}
+  _armL: {fileID: 2820081174954800102}
+  _armR: {fileID: 7621204146408985440}
+  _coreObject: {fileID: 144895318575177576}
+  _coreSpriteRenderer: {fileID: 9216639898491200685}
+  _shockwave: {fileID: 0}
+--- !u!114 &1428830662360480358
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd9dc302a5ffa794492834dbaf54e651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossGroggyTrigger
+  _testBossCore: {fileID: 2305401549654009775}
+  _triggerKey: 20
+  _groogyDurationOverride: 0
+  _dilTimeTriggerKey: 21
 --- !u!1 &2853523502403396510
 GameObject:
   m_ObjectHideFlags: 0
@@ -378,6 +569,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1814246414852122713}
   - component: {fileID: 6019077079977006523}
+  - component: {fileID: 7621204146408985440}
   m_Layer: 0
   m_Name: Arm_R
   m_TagString: Untagged
@@ -459,3 +651,18 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!114 &7621204146408985440
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4689039438399731876}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e6302463f7c8e248907d691a04248ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.TestBossArmPart
+  _partType: 1
+  _spriteRenderer: {fileID: 6019077079977006523}
+  _executionRangeOverride: 0
