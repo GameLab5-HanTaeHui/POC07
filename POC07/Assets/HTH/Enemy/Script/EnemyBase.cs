@@ -125,7 +125,7 @@ namespace KEY
         public float MaxHp => _settings != null ? _settings.maxHp : 1f;
 
         /// <summary> 체력 비율 (0~1). UI 체력바용. </summary>
-        public virtual float HpRatio => MaxHp > 0f ? _currentHp / MaxHp : 0f;
+        public float HpRatio => MaxHp > 0f ? _currentHp / MaxHp : 0f;
 
         /// <summary> 현재 무적 여부. </summary>
         public bool IsInvincible => _isInvincible;

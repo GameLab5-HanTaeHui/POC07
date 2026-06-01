@@ -28,7 +28,7 @@ Transform:
   m_GameObject: {fileID: 35428407085221508}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.625, z: 0}
+  m_LocalPosition: {x: 0.5, y: -0.25, z: 0}
   m_LocalScale: {x: 0.5, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4768,7 +4768,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c80e699393449f241b37b675f1e48286, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.BossKnight
-  _settings: {fileID: 0}
   _bossData: {fileID: 11400000, guid: d2fa6674f13e63440b76c5ba285e35d3, type: 2}
   _allParts:
   - {fileID: 130790226847107900}
