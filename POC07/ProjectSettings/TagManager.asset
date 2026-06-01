@@ -25,17 +25,17 @@ TagManager:
   - EnemyLock
   - EnemyShield
   - EnemySeal
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
   - Ground
   - Wall
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
   - 
   m_SortingLayers:
   - name: Default

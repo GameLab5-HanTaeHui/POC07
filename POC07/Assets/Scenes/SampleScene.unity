@@ -1495,7 +1495,7 @@ GameObject:
   - component: {fileID: 963496737}
   - component: {fileID: 963496736}
   - component: {fileID: 963496735}
-  m_Layer: 21
+  m_Layer: 30
   m_Name: Wall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1737,7 +1737,7 @@ GameObject:
   - component: {fileID: 1012358268}
   - component: {fileID: 1012358267}
   - component: {fileID: 1012358266}
-  m_Layer: 20
+  m_Layer: 29
   m_Name: Ground
   m_TagString: Untagged
   m_Icon: {fileID: 0}
