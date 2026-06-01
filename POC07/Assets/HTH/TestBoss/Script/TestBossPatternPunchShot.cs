@@ -157,9 +157,9 @@ namespace KEY
         /// 발사 방향에 따라 부호 자동 결정.
         /// 권투 선수가 팔을 뒤로 당기는 느낌.
         /// </summary>
-        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -35~-45.")]
+        [Tooltip("Warning 팔 뒤로 젖힘 각도 (도). 권장: -90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = -35f;
+        [SerializeField] private float _windupRotate = -90f;
 
         /// <summary>
         /// Warning 회전 소요 시간 (초).
@@ -172,13 +172,20 @@ namespace KEY
         /// Active 발사 시 앞으로 오버슈트 회전각 (도).
         /// 주먹이 힘차게 뻗어나가는 느낌 강조.
         /// </summary>
-        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 70~80")]
+        [Tooltip("Active 발사 오버슈트 회전각 (도). 권장: 90.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _shotOvershoot = 80f;
+        [SerializeField] private float _shotOvershoot = 90f;
 
         // ──────────────────────────────────────────
         // Inspector — 봉인 후퇴
         // ──────────────────────────────────────────
+
+        /// <summary>
+        /// 플레이어 감지 레이어.
+        /// ★ OverlapBox 로 직접 감지 (OnTriggerEnter2D 오브젝트 불일치 문제).
+        /// </summary>
+        [Tooltip("플레이어 감지 레이어. Player 레이어 선택.")]
+        [SerializeField] private LayerMask _playerLayer;
 
         [Header("── 봉인 시 후퇴 ──────────────────────")]
 
@@ -484,21 +491,9 @@ namespace KEY
         // ══════════════════════════════════════════════════════
         // 물리 충돌
         // ══════════════════════════════════════════════════════
-
-        private void OnTriggerEnter2D(Collider2D other)
-        {
-            if (!other.TryGetComponent<IDamageable>(out var damageable)) return;
-            if (other.GetComponentInParent<TestBossCore>() != null) return;
-
-            var info = new DamageInfo(
-                _armTransform ? _armTransform.position : transform.position,
-                _punchDamage,
-                new Vector2(_shotDirection, 0f),
-                AttackType.Combo1);
-
-            damageable.TakeDamage(info);
-            Debug.Log($"[TestBossPattern_PunchShot] 플레이어 피격: -{_punchDamage}");
-        }
+        // ★ OnTriggerEnter2D 제거.
+        //   _hitbox(Arm_R) 와 스크립트(PunchShot) 가 다른 오브젝트.
+        //   대신 OnActive() 내부 Physics2D.OverlapBoxAll 로 직접 감지.
 
         // ══════════════════════════════════════════════════════
         // Gizmos

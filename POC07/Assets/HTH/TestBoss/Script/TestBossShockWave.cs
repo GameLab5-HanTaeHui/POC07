@@ -225,11 +225,18 @@ namespace KEY
                     - (Vector2)origin).normalized;
 
                 // 상방 혼합: 수평 + 상방 bias
+                // ★ Lerp 후 normalized 로 단위 벡터 보장
                 Vector2 finalDir = Vector2.Lerp(horizontal, Vector2.up, _upwardBias).normalized;
 
-                // Impulse 적용 (데미지 없음)
-                rb.linearVelocity = Vector2.zero; // 기존 속도 초기화 후 적용
-                rb.AddForce(finalDir * _shockwavePower, ForceMode2D.Impulse);
+                // ★ AddForce 대신 linearVelocity 직접 설정
+                //   PlayerMover 가 매 FixedUpdate velocity.x 를 덮어쓰므로
+                //   AddForce 는 즉시 무효화됨.
+                //   velocity 직접 설정 후 InputManager 이동 입력 일시 차단으로 보장.
+                rb.linearVelocity = finalDir * _shockwavePower;
+
+                // 플레이어 이동 입력 일시 차단 (충격파 날아가는 동안 이동 불가)
+                if (InputManager.Instance != null)
+                    StartCoroutine(BlockPlayerMoveRoutine(_hitStopDuration + 0.3f));
 
                 Debug.Log($"[TestBossShockwave] 플레이어 밀침 → 방향:{finalDir}" +
                           $" 강도:{_shockwavePower}");
@@ -239,6 +246,23 @@ namespace KEY
         // ══════════════════════════════════════════════════════
         // 히트스탑
         // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 플레이어 이동 입력 일시 차단 코루틴.
+        /// 충격파로 날아가는 동안 이동 키 입력이 velocity 를 덮어쓰지 않도록.
+        /// </summary>
+        private IEnumerator BlockPlayerMoveRoutine(float duration)
+        {
+            InputManager.Instance?.BlockMove();
+            InputManager.Instance?.BlockJump();
+            InputManager.Instance?.BlockDash();
+
+            yield return new WaitForSeconds(duration);
+
+            InputManager.Instance?.UnblockMove();
+            InputManager.Instance?.UnblockJump();
+            InputManager.Instance?.UnblockDash();
+        }
 
         /// <summary>
         /// 히트스탑 코루틴.
