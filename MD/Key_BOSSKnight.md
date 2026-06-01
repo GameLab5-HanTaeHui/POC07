@@ -904,16 +904,32 @@ Phase 3
 
 ## 미결 항목
 
+### 완료
+
+| 항목 | 상태 | 버전 | 메모 |
+|---|---|---|---|
+| EnemyBossBase 분리 | ✅ 완료 | v1.0 | EnemyBase 억지 상속 해소 |
+| Phase 1 전투 구조 수정 | ✅ 완료 | v0.29 | 팔 해제 시작 → 처형으로 봉인 → 코어 활성 → 딜타임 |
+| BossPartComponent SpeedMultiplier 수정 | ✅ 완료 | v1.3 | 봉인=느림, 해제=빠름 방향 수정 |
+| BossPartComponent 색상 피드백 | ✅ 완료 | v1.3 | 잠금=파랑, 해제=빨강 |
+| BossPartComponent 팔 해제 시작 | ✅ 완료 | v1.3 | ArmL/ArmR Initialize() 해제 상태로 시작 |
+| BossCoreLock IsGroggy 조건 제거 | ✅ 완료 | v1.2 | 양팔 봉인 즉시 코어 활성 |
+| BossCoreLock 딜타임 종료 양팔 해제 | ✅ 완료 | v1.2 | ExitDilTime() → ForceUnlock × 2 → Shockwave |
+| BossKnight TakeDamage 수정 | ✅ 완료 | v1.2 | 딜타임 중 코어만 HP 감소 |
+| BossKnight IsAllLocksCleared Core 제외 | ✅ 완료 | v1.2 | Core 타입 제외 처리 |
+| BossExecutionHandler 처형 흐름 재설계 | ✅ 완료 | v1.1 | A키 홀드 즉시 이동 + Rigidbody2D |
+| BossExecutionHandler EnterDilTime 연결 | ✅ 완료 | v1.1 | 코어 처형 완료 시 딜타임 진입 |
+| Prefab Arm LockComponent 제거 | ✅ 완료 | v0.29 | 일반 공격으로 팔 해제되는 문제 차단 |
+| Prefab Core SetActive = false | ✅ 완료 | v0.29 | 시작부터 코어 노출 문제 수정 |
+| Prefab Core._activePhases Phase1 추가 | ✅ 완료 | v0.29 | Phase1 딜타임 진입 가능 |
+
+### 미완료
+
 | 항목 | 상태 | 메모 |
 |---|---|---|
-| Phase 1 전투 구조 수정 | ✅ v0.29 | 역방향 잠금 구조로 전면 개정 |
-| BossPartComponent 색상 피드백 | ✅ v1.3 | 잠금=파랑, 해제=빨강 |
-| BossCoreLock 딜타임 종료 양팔 해제 | ✅ v1.2 | ExitDilTime() ForceUnlock 추가 |
-| BossKnight TakeDamage 수정 | ✅ v1.2 | 딜타임 중 코어만 HP 감소 |
-| EnemyBossBase 분리 | ✅ v1.0 | EnemyBase 억지 상속 해소 |
-| BossExecutionHandler 처형 흐름 | ✅ v1.1 | A키 홀드 즉시 이동 + Rigidbody2D |
-| SealComponent ApplySealByType() 패치 | 🔲 패치 필요 | SealComponent_patch.txt |
-| BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | |
+| SealComponent ApplySealByType() 패치 | 🔲 패치 필요 | BossCounterSystem 대타 출동 연동 필요 |
+| BossKnightDataSO 수치 밸런싱 | 🔲 미착수 | 쿨타임 / 딜타임 / 속도 등 전반 |
 | 보스 Animator Controller | 🔲 미착수 | 보스 전용 Controller 제작 필요 |
 | 보스 스프라이트 / 애니메이션 | 🔲 미착수 | |
 | 보스 룸 씬 구성 | 🔲 미착수 | |
+| Phase1 패턴 검증 | 🔲 미착수 | ShieldCharge/DefenseStance/PunchR 실제 동작 확인 필요 |

@@ -304,13 +304,22 @@ namespace KEY
             // ⑤ 잠금 / 해제 실행
             if (part.IsUnlocked)
             {
+                // 해제 상태 부위 → 재잠금
                 part.ReLock();
                 Debug.Log($"[BossExecutionHandler] 처형 완료 → {part.PartType} 재잠금");
             }
             else
             {
+                // 잠금 상태 부위 → 해제
                 part.ForceUnlock();
                 Debug.Log($"[BossExecutionHandler] 처형 완료 → {part.PartType} 해제");
+
+                // 코어 해제 → 딜타임 진입
+                if (part.PartType == BossPartType.Core && _coreLock != null)
+                {
+                    Debug.Log("[BossExecutionHandler] 코어 해제 → 딜타임 진입");
+                    _coreLock.EnterDilTime();
+                }
             }
 
             // ⑥ 완료 이펙트
