@@ -30,6 +30,9 @@ MonoBehaviour:
   wallCheckDistance: 0.6
   cliffCheckDistance: 1
   cliffCheckOffset: 0.4
+  meleeAttackDamage: 10
+  meleeAttackCooldown: 2
+  meleeAttackRange: 2
   groggyDuration: 2.5
   flipCooldown: 2
   playerLayer:
@@ -37,7 +40,7 @@ MonoBehaviour:
     m_Bits: 1024
   groundLayer:
     serializedVersion: 2
-    m_Bits: 3145728
+    m_Bits: 540016640
   attackHitLayer:
     serializedVersion: 2
     m_Bits: 1024

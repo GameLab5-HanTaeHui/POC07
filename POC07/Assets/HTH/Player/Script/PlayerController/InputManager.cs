@@ -152,6 +152,7 @@ namespace KEY
         private bool _dashBlocked;
         private float _verticalInput;
         private bool _isKeySwapMode;
+        private bool _isAttackHeld;
 
         // ──────────────────────────────────────────
         // 이벤트 — InGame (항상 발행)
@@ -235,6 +236,12 @@ namespace KEY
 
         /// <summary> 현재 점프 차단 여부. </summary>
         public bool IsJumpBlocked => _jumpBlocked;
+
+        /// <summary>
+        /// A키(공격) 홀드 중 여부.
+        /// BossExecutionHandler 에서 처형 입력 감지에 사용.
+        /// </summary>
+        public bool IsAttackHeld => _isAttackHeld;
 
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
@@ -376,8 +383,14 @@ namespace KEY
             // 공격 — KeySwap 모드 시 슬롯 8번 전환
             _actionAttack.performed += _ =>
             {
+                _isAttackHeld = true;
                 if (_isKeySwapMode) OnKeySwap?.Invoke(8);
                 else OnAttack?.Invoke();
+            };
+
+            _actionAttack.canceled += _ =>
+            {
+                _isAttackHeld = false;
             };
 
             // ── 차징 ──────────────────────
@@ -419,70 +432,69 @@ namespace KEY
         /// 별도 추가 없음 — 이중 등록 / 이중 발행 방지.
         /// </summary>
         private void BuildKeySwapMap()
-{
-    _keySwapMap = new InputActionMap("KeySwap");
-
-    // ── SwapMode 토글 ──────────────────────
-    _actionSwapMode = _keySwapMap.AddAction("SwapMode", InputActionType.Button);
-    _actionSwapMode.AddBinding(KeyToPath(_keySwapMode));
-
-    _actionSwapMode.performed += _ => EnterKeySwapMode();
-    _actionSwapMode.canceled += _ => ExitKeySwapMode();
-
-    // ── 슬롯 15개 (슬롯 8=A 제외) ──────────────────────
-    // 슬롯 8 (A 키) 는 _actionAttack 콜백에서 분기 처리.
-    // 여기서 중복 등록하면 KeySwap ON 시 이중 발행 발생.
-    _actionSwapSlots = new InputAction[_keySwapSlots.Length];
-
-    for (int i = 0; i < _keySwapSlots.Length; i++)
-    {
-        if (i == 8) { _actionSwapSlots[i] = null; continue; }
-
-        int capturedIndex = i;
-        var action = _keySwapMap.AddAction($"Slot{i}", InputActionType.Button);
-        action.AddBinding(KeyToPath(_keySwapSlots[i]));
-        action.performed += _ =>
         {
-            if (_isKeySwapMode) OnKeySwap?.Invoke(capturedIndex);
-        };
+            _keySwapMap = new InputActionMap("KeySwap");
 
-        _actionSwapSlots[i] = action;
-    }
-}
+            // ── SwapMode 토글 ──────────────────────
+            _actionSwapMode = _keySwapMap.AddAction("SwapMode", InputActionType.Button);
+            _actionSwapMode.AddBinding(KeyToPath(_keySwapMode));
 
-// ══════════════════════════════════════════════════════
-// KeySwap 모드 전환
-// ══════════════════════════════════════════════════════
+            _actionSwapMode.performed += _ => EnterKeySwapMode();
+            _actionSwapMode.canceled += _ => ExitKeySwapMode();
 
-/// <summary>
-/// KeySwap 모드 진입.
-/// 이동은 계속 허용. 공격만 슬롯 교체로 전환.
-/// </summary>
-private void EnterKeySwapMode()
-{
-    if (_isKeySwapMode) return;
-    _isKeySwapMode = true;
-    OnKeySwapModeChanged?.Invoke(true);
-}
+            // ── 슬롯 15개 (슬롯 8=A 제외) ──────────────────────
+            // 슬롯 8 (A 키) 는 _actionAttack 콜백에서 분기 처리.
+            // 여기서 중복 등록하면 KeySwap ON 시 이중 발행 발생.
+            _actionSwapSlots = new InputAction[_keySwapSlots.Length];
 
-/// <summary>
-/// KeySwap 모드 해제.
-/// </summary>
-private void ExitKeySwapMode()
-{
-    if (!_isKeySwapMode) return;
-    _isKeySwapMode = false;
-    OnKeySwapModeChanged?.Invoke(false);
-}
+            for (int i = 0; i < _keySwapSlots.Length; i++)
+            {
+                if (i == 8) { _actionSwapSlots[i] = null; continue; }
 
-// ══════════════════════════════════════════════════════
-// 내부 핸들러
-// ══════════════════════════════════════════════════════
+                int capturedIndex = i;
+                var action = _keySwapMap.AddAction($"Slot{i}", InputActionType.Button);
+                action.AddBinding(KeyToPath(_keySwapSlots[i]));
+                action.performed += _ =>
+                {
+                    if (_isKeySwapMode) OnKeySwap?.Invoke(capturedIndex);
+                };
 
-private void HandleJump()
-{
-    if (_jumpBlocked) return;
-    OnJump?.Invoke();
-}
+                _actionSwapSlots[i] = action;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════
+        // KeySwap 모드 전환
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// KeySwap 모드 진입.
+        /// 이동은 계속 허용. 공격만 슬롯 교체로 전환.
+        /// </summary>
+        private void EnterKeySwapMode()
+        {
+            if (_isKeySwapMode) return;
+            _isKeySwapMode = true;
+            OnKeySwapModeChanged?.Invoke(true);
+        }
+
+        /// <summary>
+        /// KeySwap 모드 해제.
+        /// </summary>
+        private void ExitKeySwapMode()
+        {
+            if (!_isKeySwapMode) return;
+            _isKeySwapMode = false;
+            OnKeySwapModeChanged?.Invoke(false);
+        }
+
+        // ══════════════════════════════════════════════════════
+        // 내부 핸들러
+        // ══════════════════════════════════════════════════════
+        private void HandleJump()
+        {
+            if (_jumpBlocked) return;
+            OnJump?.Invoke();
+        }
     }
 }

@@ -13,7 +13,34 @@ MonoBehaviour:
   m_Name: EnemyDummy
   m_EditorClassIdentifier: Assembly-CSharp::KEY.EnemyDataSO
   enemyName: "\uC801"
+  enemyType: 0
   maxHp: 1e+15
   knockbackForce: 5
+  knockbackDecay: 0.8
   iFrameDuration: 0.3
   hitFlashInterval: 0.07
+  patrolSpeed: 2
+  chaseSpeed: 3.5
+  idleTimeMin: 1
+  idleTimeMax: 3
+  idleChance: 0.3
+  patrolSightRange: 6
+  chaseSightRadius: 10
+  chargeDetectRange: 5
+  wallCheckDistance: 0.6
+  cliffCheckDistance: 1
+  cliffCheckOffset: 0.4
+  meleeAttackDamage: 10
+  meleeAttackCooldown: 2
+  meleeAttackRange: 2
+  groggyDuration: 2.5
+  flipCooldown: 2
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 536870912
+  attackHitLayer:
+    serializedVersion: 2
+    m_Bits: 0

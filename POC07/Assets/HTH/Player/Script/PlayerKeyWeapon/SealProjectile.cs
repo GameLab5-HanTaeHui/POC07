@@ -249,7 +249,7 @@ namespace KEY
             if (_isActive) Expire();
         }
 
-        private void Expire()
+        public void Expire()
         {
             if (!_isActive) return;
             _isActive = false;

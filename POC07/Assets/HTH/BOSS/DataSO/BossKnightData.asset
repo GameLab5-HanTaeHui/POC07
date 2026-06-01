@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37b9a05a9656d57468901ed81b34f3f2, type: 3}
+  m_Name: BossKnightData
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.BossKnightDataSO
+  bossName: "\uBD09\uC778\uB41C \uAE30\uC0AC"
+  maxHp: 1000
+  knockbackForce: 3
+  knockbackDecay: 0.8
+  iFrameDuration: 0.2
+  hitFlashInterval: 0.05
+  phase1To2HpRatio: 0.5
+  phase2To3HpRatio: 0
+  groggyDuration: 4
+  dilTimeDuration: 7
+  shockwaveRadius: 8
+  shockwavePower: 20
+  executionHoldDuration: 1.5
+  executionRange: 2
+  flipCooldown: 3
+  dodgeCooldown: 10
+  dodgeMinInterval: 5
+  dodgeTeleportOffset: 5
+  dodgeBackstepSpeed: 8
+  dodgeBackstepDuration: 0.3
+  counterInitialCooldown: 12
+  counterCooldownPhase2: 60
+  counterCooldownPhase3: 30
+  counterDetectRadius: 15
+  rangeIndicatorEnabled: 1
+  attackHitLayer:
+    serializedVersion: 2
+    m_Bits: 1024
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 536870912
+  p1:
+    moveSpeed: 2
+    shieldChargeCooldown: 5
+    defenseStanceCooldown: 6
+    defenseStanceDuration: 3
+    punchCooldown: 4
+  p2:
+    moveSpeed: 3
+    advanceCooldown: 4
+    chargeCooldown: 6
+    swordSlash7Cooldown: 5
+    swordSlash12Cooldown: 7
+  p3:
+    moveSpeed: 4
+    slash4Cooldown: 5
+    slash0Cooldown: 8
+    slash1Cooldown: 5
+    punchDashCooldown: 4
+    grabCooldown: 7

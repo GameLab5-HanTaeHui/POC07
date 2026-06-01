@@ -340,9 +340,9 @@ namespace KEY
         public Phase3Settings p3 = new Phase3Settings
         {
             moveSpeed = 4.0f,
-            slash4Cooldown = 5.0f,
-            slash0Cooldown = 8.0f,
-            slash1Cooldown = 5.0f,
+            swordSlash4Cooldown = 5.0f,
+            swordSlash0Cooldown = 8.0f,
+            swordSlash1Cooldown = 5.0f,
             punchDashCooldown = 4.0f,
             grabCooldown = 7.0f,
         };
@@ -407,13 +407,13 @@ namespace KEY
         [Min(0f)] public float moveSpeed;
 
         [Tooltip("검 제식 4 (도넛 원형 베기) 쿨타임.")]
-        [Min(0f)] public float slash4Cooldown;
+        [Min(0f)] public float swordSlash4Cooldown;
 
         [Tooltip("검 제식 0 (연속 4회 확장 베기) 쿨타임.")]
-        [Min(0f)] public float slash0Cooldown;
+        [Min(0f)] public float swordSlash0Cooldown;
 
         [Tooltip("검 제식 1 (직선 돌진 찌르기) 쿨타임.")]
-        [Min(0f)] public float slash1Cooldown;
+        [Min(0f)] public float swordSlash1Cooldown;
 
         [Tooltip("주먹 돌진 쿨타임.")]
         [Min(0f)] public float punchDashCooldown;

@@ -257,6 +257,20 @@ namespace KEY
             RefreshVisual();
         }
 
+        /// <summary>
+        /// 자물쇠 즉시 강제 해제. (v2.2 추가)
+        /// 피격 횟수 없이 바로 해제.
+        /// BossPartComponent.ForceUnlock() 에서 호출.
+        /// A키 홀드 처형으로 자물쇠를 직접 해제할 때 사용.
+        /// 이미 해제된 자물쇠는 무시.
+        /// </summary>
+        public void ForceUnlock()
+        {
+            if (_isUnlocked) return;
+            _currentHitCount = _requiredHitCount;
+            Unlock();
+        }
+
         // ══════════════════════════════════════════════════════
         // Gizmos
         // ══════════════════════════════════════════════════════

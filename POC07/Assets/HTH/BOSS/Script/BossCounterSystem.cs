@@ -256,7 +256,7 @@ namespace KEY
                 _parryEffect.Play();
 
             // 투사체 소멸 처리
-            projectile.DestroyProjectile();
+            projectile.Expire();
 
             // 쿨타임 시작
             float cooldown = _boss.CurrentPhase == BossPhase.Phase3
@@ -328,7 +328,7 @@ namespace KEY
             hand.ForceUnlock(); // 봉인 상태 = IsLocked = true → 이미 잠겨있으면 패턴 제외
 
             // 투사체 소멸
-            projectile.DestroyProjectile();
+            projectile.Expire();
 
             // 주먹 원위치 복귀
             elapsed = 0f;

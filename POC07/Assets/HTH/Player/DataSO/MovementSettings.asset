@@ -26,8 +26,8 @@ MonoBehaviour:
   DashBodyWidth: 0.25
   GroundLayer:
     serializedVersion: 2
-    m_Bits: 1048576
+    m_Bits: 537919488
   GroundCheckRadius: 0.1
   DashWallLayer:
     serializedVersion: 2
-    m_Bits: 2097152
+    m_Bits: 1075838976

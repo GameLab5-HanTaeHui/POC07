@@ -145,7 +145,7 @@ namespace KEY
 
         private float _cooldownTimer;
         private bool _isPaused;
-        private bool _isInterrupted;
+        protected bool _isInterrupted;
         private bool _isExecuting;
 
         /// <summary>
