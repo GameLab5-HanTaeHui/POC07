@@ -329,8 +329,8 @@ Transform:
   m_GameObject: {fileID: 114974584}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.981, y: 1.208, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 3, y: 7, z: 0}
+  m_LocalScale: {x: 5, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -83346,6 +83346,10 @@ PrefabInstance:
     - target: {fileID: 8738884026237173882, guid: f2fb4127707bd244bb27e5230df05d4d, type: 3}
       propertyPath: m_Name
       value: BossKnight
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738884026237173882, guid: f2fb4127707bd244bb27e5230df05d4d, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
