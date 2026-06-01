@@ -1,6 +1,13 @@
 ﻿// ============================================================
-// BossCounterSystem.cs  v1.0
+// BossCounterSystem.cs  v1.1
 // 검 무식 / 대타 출동 통합 관리
+//
+// [v1.1 변경]
+//   대타 출동 주먹 봉인 처리 수정.
+//   기존: hand.ForceUnlock() 호출 (자물쇠 해제 — 잘못된 로직)
+//   변경: Hand2L/R 의 SealComponent.ApplySeal() 호출 (행동 봉인 — 올바른 로직)
+//   _interceptHandSeals 필드 추가 (Hand2L/R 의 SealComponent 목록).
+//   대타 출동 봉인 해제는 SealComponent 자체 타이머로 자동 처리.
 //
 // [역할]
 //   봉인 투사체 감지 → 상태 판단 → 반격 패턴 실행.
@@ -35,7 +42,7 @@ using static KEY.BossKnightAI;
 namespace KEY
 {
     /// <summary>
-    /// 검 무식 / 대타 출동 통합 관리 컴포넌트. (v1.0)
+    /// 검 무식 / 대타 출동 통합 관리 컴포넌트. (v1.1)
     /// </summary>
     public class BossCounterSystem : MonoBehaviour
     {
@@ -51,6 +58,23 @@ namespace KEY
         /// </summary>
         [Tooltip("대타 출동용 주먹 파트 (Hand2L / Hand2R).")]
         [SerializeField] private List<BossPartComponent> _interceptHands = new();
+
+        /// <summary>
+        /// 대타 출동 주먹별 SealComponent.
+        /// Hand2L / Hand2R 오브젝트에 각각 부착된 SealComponent.
+        /// 대타 출동 시 해당 주먹에 Dash 봉인 적용 → 패턴에서 제외.
+        /// _interceptHands 와 인덱스 1:1 대응.
+        /// </summary>
+        [Tooltip("Hand2L / Hand2R 의 SealComponent. _interceptHands 와 순서 일치.")]
+        [SerializeField] private List<SealComponent> _interceptHandSeals = new();
+
+        /// <summary>
+        /// 대타 출동 봉인 지속 시간 (초).
+        /// 봉인된 주먹이 패턴에서 제외되는 시간.
+        /// </summary>
+        [Tooltip("대타 출동 봉인 지속 시간 (초). 권장: 3~5.")]
+        [Min(0.5f)]
+        [SerializeField] private float _interceptSealDuration = 4.0f;
 
         [Header("── 검 무식 이펙트 ──────────────────────")]
 
@@ -278,13 +302,19 @@ namespace KEY
 
         private bool TryIntercept(SealProjectile projectile)
         {
-            // 가용 주먹 탐색 (봉인되지 않은 Hand2L / Hand2R)
+            // 가용 주먹 탐색
+            // 조건: IsActive (Phase 3 활성) + Dash 봉인 없음 (이전 대타 출동으로 봉인 안 됨)
             BossPartComponent availableHand = null;
             float minDist = float.MaxValue;
 
-            foreach (var hand in _interceptHands)
+            for (int i = 0; i < _interceptHands.Count; i++)
             {
-                if (hand == null || !hand.IsActive || hand.IsLocked) continue;
+                var hand = _interceptHands[i];
+                if (hand == null || !hand.IsActive) continue;
+
+                // SealComponent 로 Dash 봉인 여부 확인
+                var seal = (i < _interceptHandSeals.Count) ? _interceptHandSeals[i] : null;
+                if (seal != null && seal.IsSealedAction(SealType.Dash)) continue; // 봉인 중
 
                 float dist = Vector3.Distance(
                     hand.transform.position,
@@ -297,7 +327,7 @@ namespace KEY
                 }
             }
 
-            if (availableHand == null) return false; // 가용 주먹 없음
+            if (availableHand == null) return false;
 
             StartCoroutine(ExecuteIntercept(projectile, availableHand));
             return true;
@@ -309,40 +339,71 @@ namespace KEY
         {
             _isCounterActive = true;
 
-            // 주먹 이동 (Transform.position 직접 이동 — 추후 DOTween 으로 교체)
+            // 해당 주먹의 SealComponent 취득
+            int handIdx = _interceptHands.IndexOf(hand);
+            SealComponent handSeal = (handIdx >= 0 && handIdx < _interceptHandSeals.Count)
+                ? _interceptHandSeals[handIdx]
+                : null;
+
+            // 주먹 이동 (추후 DOTween 으로 교체)
             Vector3 originalPos = hand.transform.position;
             Vector3 projectilePos = projectile.transform.position;
-
             float elapsed = 0f;
-            float duration = 0.15f;
+            float moveDuration = 0.15f;
 
-            while (elapsed < duration)
+            while (elapsed < moveDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
+                float t = Mathf.Clamp01(elapsed / moveDuration);
                 hand.transform.position = Vector3.Lerp(originalPos, projectilePos, t);
                 yield return null;
             }
 
-            // 주먹에 봉인 적용 (ForceUnlock 대신 ReLock 반대 — 봉인 상태로)
-            hand.ForceUnlock(); // 봉인 상태 = IsLocked = true → 이미 잠겨있으면 패턴 제외
-
             // 투사체 소멸
             projectile.Expire();
 
+            // ★ 주먹에 행동 봉인 적용 (자물쇠 해제가 아닌 SealComponent 봉인)
+            // Dash 봉인으로 해당 주먹을 사용하는 패턴 제외
+            if (handSeal != null)
+            {
+                // KeyDataSO 없이 직접 봉인 적용
+                // SealComponent.ApplySealDirect(SealType, duration) 이 없으면
+                // _interceptSealDuration 동안 수동 처리
+                StartCoroutine(ApplyInterceptSeal(handSeal, hand));
+            }
+
             // 주먹 원위치 복귀
             elapsed = 0f;
-            while (elapsed < duration)
+            while (elapsed < moveDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
+                float t = Mathf.Clamp01(elapsed / moveDuration);
                 hand.transform.position = Vector3.Lerp(projectilePos, originalPos, t);
                 yield return null;
             }
             hand.transform.position = originalPos;
 
             _isCounterActive = false;
-            Debug.Log($"[BossCounterSystem] 대타 출동 완료 ({hand.PartType})");
+            Debug.Log($"[BossCounterSystem] 대타 출동 완료 ({hand.PartType}) — 봉인 적용됨");
+        }
+
+        /// <summary>
+        /// 대타 출동 봉인 적용 코루틴.
+        /// SealComponent 에 Dash 봉인을 _interceptSealDuration 동안 적용.
+        /// BossPartComponent.IsLocked 는 변경하지 않음 (자물쇠와 무관).
+        /// </summary>
+        private IEnumerator ApplyInterceptSeal(SealComponent seal, BossPartComponent hand)
+        {
+            // SealComponent 에 직접 Dash 봉인 등록
+            // SealComponent.ApplySealDirect() 가 없다면 아래 방식으로 처리
+            seal.ApplySealByType(SealType.Dash, _interceptSealDuration);
+
+            Debug.Log($"[BossCounterSystem] {hand.PartType} Dash 봉인 적용 " +
+                      $"({_interceptSealDuration:F1}초)");
+
+            yield return new WaitForSeconds(_interceptSealDuration);
+
+            Debug.Log($"[BossCounterSystem] {hand.PartType} Dash 봉인 해제");
         }
 
         // ══════════════════════════════════════════════════════

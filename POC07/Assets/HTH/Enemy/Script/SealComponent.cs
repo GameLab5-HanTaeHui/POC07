@@ -250,6 +250,35 @@ namespace KEY
                       $"현재 봉인 수: {_activeSeals.Count}");
         }
 
+        /// <summary>
+        /// KeyDataSO 없이 SealType 과 지속 시간으로 직접 봉인 적용. (v1.4 추가)
+        /// BossCounterSystem 의 대타 출동에서 주먹 봉인 시 사용.
+        /// maxSealCount 는 10으로 고정 (보스 부위 봉인 전용).
+        /// </summary>
+        public void ApplySealByType(SealType type, float duration)
+        {
+            // 같은 타입 재적용 → 타이머 리셋
+            if (_activeSeals.ContainsKey(type))
+            {
+                _activeSeals[type] = duration;
+                RefreshSealOrder(type);
+                Debug.Log($"[SealComponent] 봉인 타이머 리셋: {type} ({duration:F1}초)");
+                return;
+            }
+
+            // 새 봉인 등록
+            _activeSeals[type] = duration;
+            _sealOrder.Enqueue(type);
+
+            // 비주얼 피드백
+            if (_spriteRenderer != null)
+                HitFeedback.SealApplied(_spriteRenderer, transform);
+
+            OnSealApplied?.Invoke(type);
+
+            Debug.Log($"[SealComponent] 직접 봉인 적용: {type} ({duration:F1}초)");
+        }
+
         // ══════════════════════════════════════════════════════
         // 외부 API — EnemyAI / EnemyKnight 에서 호출
         // ══════════════════════════════════════════════════════
