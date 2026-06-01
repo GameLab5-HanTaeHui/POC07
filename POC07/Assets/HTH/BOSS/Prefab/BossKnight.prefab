@@ -2860,7 +2860,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.BossPartComponent
   _partType: 8
-  _activePhases: 0100000002000000
+  _activePhases: 000000000100000002000000
   _lockComponent: {fileID: 6748220436585209531}
   _lockCollider: {fileID: 4840739885641569293}
   _affectedPatterns: []
@@ -4874,6 +4874,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d54975bb03d494646b4dae5f8feb0c06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.BossExecutionHandler
+  _executionMoveSpeed: 15
+  _arrivalThreshold: 0.3
   _executionEffect: {fileID: 0}
   _executionProgressEffect: {fileID: 0}
 --- !u!114 &7978693032159621181

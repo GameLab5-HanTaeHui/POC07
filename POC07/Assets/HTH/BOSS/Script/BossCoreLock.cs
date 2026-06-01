@@ -1,6 +1,28 @@
 ﻿// ============================================================
-// BossCoreLock.cs  v1.0
+// BossCoreLock.cs  v1.1
 // 보스 코어 자물쇠 — 활성 조건 감지 + 딜타임 관리
+//
+// [v1.1 변경 — IsGroggy 조건 제거]
+//
+//   [기존 v1.0 문제]
+//     CheckCoreActivation() 에서 if (!_ai.IsGroggy) return 조건 존재
+//     → 그로기 상태에서만 코어 활성 가능
+//     → 봉인 투사체로 팔을 봉인해도 그로기가 아니면 코어 미활성
+//
+//   [기획 의도]
+//     코어 활성 조건: 왼팔 + 오른팔 동시 봉인 상태
+//     → 그로기 조건 없음
+//     → 양팔이 봉인된 순간 즉시 코어 활성화
+//     → 이후 A키 홀드 처형으로 코어 해제 → 딜타임 진입
+//
+//   [수정 내용]
+//     CheckCoreActivation() 에서 if (!_ai.IsGroggy) return 제거
+//     → 양팔 봉인 상태가 되는 즉시 코어 활성화
+//
+//   [이벤트 구독 방식 유지]
+//     OnPartReLocked (팔 재잠금) → CheckCoreActivation()
+//     OnPartUnlocked (팔 해제)   → CheckCoreActivation()
+//     → 상태 변화 시 즉시 재체크
 //
 // [역할]
 //   왼팔 + 오른팔 동시 봉인 시 코어 활성화.
@@ -8,8 +30,9 @@
 //   딜타임 종료 → 자동 코어 봉인 + 충격파.
 //
 // [활성 조건]
-//   _armL.IsLocked && _armR.IsLocked
-//   → 매 프레임 Update() 에서 체크.
+//   _armL.IsLocked && _armL.IsActive
+//   && _armR.IsLocked && _armR.IsActive
+//   → 이벤트 구독으로 상태 변화 시 즉시 체크.
 //   조건 충족 시 ActivateCore() 호출.
 //   조건 해제 시 DeactivateCore() 호출.
 //
@@ -28,7 +51,23 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 보스 코어 자물쇠 컴포넌트. (v1.0)
+    /// 보스 코어 자물쇠 컴포넌트. (v1.1)
+    ///
+    /// ────────────────────────────────────────────────────
+    /// [코어 활성 흐름]
+    ///   왼팔 봉인 OR 오른팔 봉인
+    ///     → OnPartReLocked 이벤트 발행
+    ///       → CheckCoreActivation() 호출
+    ///         → 양팔 모두 봉인 상태? → ActivateCore()
+    ///           → 코어 오브젝트 표시 + Collider ON
+    ///           → BossExecutionHandler 처형 가능
+    ///             → A키 홀드 처형 → BossCoreLock.EnterDilTime()
+    ///
+    /// [코어 비활성 흐름]
+    ///   팔 해제 (OnPartUnlocked)
+    ///     → CheckCoreActivation()
+    ///       → 조건 미충족 → DeactivateCore()
+    /// ────────────────────────────────────────────────────
     /// </summary>
     public class BossCoreLock : MonoBehaviour
     {
@@ -47,7 +86,7 @@ namespace KEY
 
         /// <summary>
         /// 코어의 LockComponent.
-        /// 활성화 시 A키 홀드 처형 대상이 됨.
+        /// 활성화 시 A키 홀드 처형 대상.
         /// </summary>
         [Tooltip("코어의 LockComponent.")]
         [SerializeField] private LockComponent _coreLockComponent;
@@ -61,6 +100,7 @@ namespace KEY
 
         [Header("── 코어 활성 이펙트 ──────────────────────")]
 
+        /// <summary> 코어 활성 파티클. </summary>
         [Tooltip("코어 활성 파티클.")]
         [SerializeField] private ParticleSystem _activateEffect;
 
@@ -102,6 +142,9 @@ namespace KEY
         // 초기화
         // ══════════════════════════════════════════════════════
 
+        /// <summary>
+        /// 초기화. BossKnight.Start() 에서 호출.
+        /// </summary>
         public void Initialize(BossKnight boss, BossKnightAI ai, BossKnightDataSO data)
         {
             _boss = boss;
@@ -109,21 +152,28 @@ namespace KEY
             _data = data;
         }
 
+        /// <summary>
+        /// 팔 BossPartComponent 등록 및 이벤트 구독.
+        /// BossKnight.Start() 에서 호출.
+        ///
+        /// [구독 이벤트]
+        ///   OnPartReLocked : 팔 재잠금 → 양팔 동시 봉인 조건 체크
+        ///   OnPartUnlocked : 팔 해제   → 코어 비활성 조건 체크
+        /// </summary>
         public void RegisterArmParts(BossPartComponent armL, BossPartComponent armR)
         {
             _armL = armL;
             _armR = armR;
 
-            // 팔 해제/재잠금 이벤트 구독 → 코어 조건 재체크
             if (_armL != null)
             {
-                _armL.OnPartUnlocked += _ => CheckCoreActivation();
                 _armL.OnPartReLocked += _ => CheckCoreActivation();
+                _armL.OnPartUnlocked += _ => CheckCoreActivation();
             }
             if (_armR != null)
             {
-                _armR.OnPartUnlocked += _ => CheckCoreActivation();
                 _armR.OnPartReLocked += _ => CheckCoreActivation();
+                _armR.OnPartUnlocked += _ => CheckCoreActivation();
             }
         }
 
@@ -133,13 +183,20 @@ namespace KEY
 
         /// <summary>
         /// 코어 활성 조건 체크.
-        /// BossKnight / BossPartComponent 이벤트에서 호출.
-        /// 왼팔 + 오른팔 동시 봉인 → 코어 활성.
+        /// RegisterArmParts 이벤트 구독에서 자동 호출.
+        ///
+        /// [v1.1 수정]
+        ///   IsGroggy 조건 제거.
+        ///   양팔이 봉인된 순간 즉시 활성화.
+        ///   기획: 코어 활성 조건 = 왼팔 + 오른팔 동시 봉인 상태 (그로기 무관)
+        ///
+        /// [조건]
+        ///   왼팔 IsLocked && IsActive
+        ///   오른팔 IsLocked && IsActive
+        ///   딜타임 중 아님
         /// </summary>
         public void CheckCoreActivation()
         {
-            if (_ai == null) return;
-            if (!_ai.IsGroggy) return; // 그로기 상태에서만 활성 가능
             if (_isDilTimeActive) return;
 
             bool bothArmsLocked =
@@ -159,7 +216,7 @@ namespace KEY
         /// <summary>
         /// 코어 활성화.
         /// 오브젝트 표시 + Collider ON + 이펙트 재생.
-        /// BossExecutionHandler 에 처형 가능 신호 전달.
+        /// OnCoreActivated 이벤트 발행 → BossExecutionHandler 처형 가능.
         /// </summary>
         public void ActivateCore()
         {
@@ -178,6 +235,7 @@ namespace KEY
         /// <summary>
         /// 코어 비활성화.
         /// 오브젝트 숨김 + Collider OFF.
+        /// Phase 초기화 또는 팔 해제 시 호출.
         /// </summary>
         public void DeactivateCore()
         {
@@ -199,6 +257,11 @@ namespace KEY
         /// <summary>
         /// 딜타임 진입.
         /// BossExecutionHandler 가 코어 처형 완료 시 호출.
+        ///
+        /// [흐름]
+        ///   딜타임 진입 → 보스 완전 정지
+        ///   코어에 피해 적용 가능 (직접 공격)
+        ///   dilTimeDuration 후 → 자동 코어 봉인 + 충격파 + 전투 복귀
         /// </summary>
         public void EnterDilTime()
         {
@@ -212,6 +275,10 @@ namespace KEY
             Debug.Log($"[BossCoreLock] 딜타임 진입 ({duration:F1}초)");
         }
 
+        /// <summary>
+        /// 딜타임 코루틴.
+        /// duration 경과 후 자동 종료.
+        /// </summary>
         private IEnumerator DilTimeRoutine(float duration)
         {
             yield return new WaitForSeconds(duration);
@@ -220,17 +287,14 @@ namespace KEY
 
         /// <summary>
         /// 딜타임 종료.
-        /// 자동 코어 봉인 + 충격파.
+        /// 자동 코어 봉인 + 충격파 발동.
         /// </summary>
         private void ExitDilTime()
         {
             _isDilTimeActive = false;
 
-            // 자동 코어 봉인
             DeactivateCore();
-
-            // 충격파
-            _boss.TriggerShockwave();
+            _boss?.TriggerShockwave();
 
             Debug.Log("[BossCoreLock] 딜타임 종료 → 코어 자동 봉인 + 충격파");
         }

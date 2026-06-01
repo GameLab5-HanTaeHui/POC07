@@ -1,6 +1,30 @@
 ﻿// ============================================================
-// BossPartComponent.cs  v1.0
+// BossPartComponent.cs  v1.2
 // 보스 부위 컴포넌트 — 봉인 상태 + 약점 노출 관리
+//
+// [v1.2 변경 — SpeedMultiplier 방향 수정]
+//
+//   [기존 v1.0/v1.1 문제]
+//     HandleLockUnlocked() 에서 ApplySpeedMultiplier(_sealedSpeedMultiplier) 호출
+//     → 자물쇠가 해제될 때 패턴이 느려짐 (기획과 반대)
+//     Initialize() 에서 ResetSpeedMultiplier() 호출
+//     → Phase 시작 시 봉인 상태임에도 패턴 속도 정상 (기획과 반대)
+//     ReLock() 에서 ResetSpeedMultiplier() 호출
+//     → 재잠금 시 패턴이 빨라짐 (기획과 반대)
+//
+//   [기획 의도]
+//     봉인 상태 (Locked)   : 패턴 느림 — _sealedSpeedMultiplier 적용
+//     해제 상태 (Unlocked) : 패턴 빠름 — 1.0 복귀 (위험 증가)
+//     재잠금 시            : 패턴 다시 느려짐 — _sealedSpeedMultiplier 복귀
+//
+//   [수정 내용]
+//     Initialize()         : 활성 부위 봉인 상태 시작
+//                            → ApplySpeedMultiplier(_sealedSpeedMultiplier) 호출
+//                              (봉인 상태로 Phase 시작이므로 즉시 느려짐 적용)
+//     HandleLockUnlocked() : 해제 시 패턴 빠름 적용
+//                            → ResetSpeedMultiplier() 호출 (1.0 복귀)
+//     ReLock()             : 재잠금 시 패턴 느림 복귀
+//                            → ApplySpeedMultiplier(_sealedSpeedMultiplier) 호출
 //
 // [역할]
 //   보스의 각 부위(팔/검/방패/코어 등)에 부착.
@@ -11,7 +35,7 @@
 // [A키 홀드 처형과의 연동]
 //   BossExecutionHandler 가 그로기 상태에서
 //   이 컴포넌트의 ExecutionRange 범위 내 플레이어를 감지.
-//   A키 홀드 완료 → ReLock() or Unlock() 실행.
+//   A키 홀드 완료 → ReLock() or ForceUnlock() 실행.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -24,21 +48,23 @@ using UnityEngine;
 namespace KEY
 {
     /// <summary>
-    /// 보스 부위 컴포넌트. (v1.0)
+    /// 보스 부위 컴포넌트. (v1.2)
     ///
     /// ────────────────────────────────────────────────────
-    /// [상태]
-    ///   Locked   : 자물쇠 있음. 봉인 상태. LockComponent 피격 누적.
-    ///   Unlocked : 자물쇠 해제. 약점 노출. 재잠금 가능.
+    /// [상태와 패턴 속도 관계]
+    ///   Locked   : 봉인 상태 → 패턴 느림 (_sealedSpeedMultiplier)
+    ///   Unlocked : 해제 상태 → 패턴 빠름 (1.0 복귀, 위험 증가)
     ///
     /// [Phase별 활성화]
     ///   _activePhases 에 등록된 Phase 에서만 활성.
     ///   비활성 Phase 에서는 Collider 비활성 + 피격 무시.
+    ///   비활성 부위는 패턴 속도 배율 영향 없음 (1.0 유지).
     ///
-    /// [팔 봉인 효과]
-    ///   _affectedPatterns 에 등록된 패턴에
-    ///   SetSpeedMultiplier(_sealedSpeedMultiplier) 적용.
-    ///   봉인 해제 시 1.0 으로 복귀.
+    /// [SpeedMultiplier 흐름]
+    ///   Initialize()         → 활성 부위 : ApplySpeedMultiplier (봉인 시작)
+    ///                          비활성 부위: ResetSpeedMultiplier (영향 없음)
+    ///   HandleLockUnlocked() → ResetSpeedMultiplier (해제 → 빨라짐)
+    ///   ReLock()             → ApplySpeedMultiplier (재잠금 → 느려짐)
     /// ────────────────────────────────────────────────────
     /// </summary>
     public class BossPartComponent : MonoBehaviour
@@ -81,15 +107,16 @@ namespace KEY
         [Header("── 패턴 속도 영향 ──────────────────────")]
 
         /// <summary>
-        /// 이 부위가 봉인될 때 속도가 느려지는 패턴 목록.
-        /// 팔 자물쇠 봉인 → 해당 팔 사용 패턴 느려짐.
+        /// 이 부위가 봉인(Locked) 상태일 때 느려지는 패턴 목록.
+        /// 봉인 → 패턴 느림 / 해제 → 1.0 복귀.
         /// </summary>
         [Tooltip("봉인 시 속도 영향받는 패턴 목록.")]
         [SerializeField] private List<BossPatternBase> _affectedPatterns = new();
 
         /// <summary>
-        /// 봉인 시 패턴 속도 배율.
-        /// 1.0 = 정상. 2.0 = 2배 느림.
+        /// 봉인(Locked) 시 패턴 속도 배율.
+        /// 1.0 = 정상속도. 2.0 = 2배 느림.
+        /// 해제(Unlocked) 시에는 항상 1.0 으로 복귀.
         /// </summary>
         [Tooltip("봉인 시 패턴 속도 배율. 1.0=정상 / 2.0=2배 느림.")]
         [Min(1.0f)]
@@ -100,7 +127,7 @@ namespace KEY
         /// <summary>
         /// 처형 가능 범위 반지름.
         /// BossExecutionHandler 가 플레이어와의 거리 체크에 사용.
-        /// DataSO.executionRange 를 기본값으로, 부위별 override 가능.
+        /// 0 = DataSO.executionRange 기본값 사용.
         /// </summary>
         [Tooltip("처형 가능 범위. 0 = DataSO 기본값 사용.")]
         [Min(0f)]
@@ -110,8 +137,13 @@ namespace KEY
         // 내부 상태
         // ──────────────────────────────────────────
 
+        /// <summary> 자물쇠 해제 여부. false = 봉인(Locked). </summary>
         private bool _isUnlocked;
+
+        /// <summary> 현재 Phase 에서 활성화된 부위인지 여부. </summary>
         private bool _isActiveInCurrentPhase;
+
+        /// <summary> 현재 Phase. </summary>
         private BossPhase _currentPhase;
 
         // ──────────────────────────────────────────
@@ -121,11 +153,13 @@ namespace KEY
         /// <summary>
         /// 자물쇠 해제 완료 시 발행.
         /// BossKnight.HandlePartUnlocked() 가 구독.
+        /// BossCoreLock.CheckCoreActivation() 호출 트리거.
         /// </summary>
         public event Action<BossPartType> OnPartUnlocked;
 
         /// <summary>
         /// 재잠금 완료 시 발행.
+        /// BossCoreLock.CheckCoreActivation() 호출 트리거.
         /// </summary>
         public event Action<BossPartType> OnPartReLocked;
 
@@ -133,14 +167,21 @@ namespace KEY
         // 프로퍼티
         // ──────────────────────────────────────────
 
+        /// <summary> 부위 타입. </summary>
         public BossPartType PartType => _partType;
+
+        /// <summary> 자물쇠 해제 여부. </summary>
         public bool IsUnlocked => _isUnlocked;
+
+        /// <summary> 자물쇠 봉인 여부. </summary>
         public bool IsLocked => !_isUnlocked;
+
+        /// <summary> 현재 Phase 에서 활성화된 부위인지 여부. </summary>
         public bool IsActive => _isActiveInCurrentPhase;
 
         /// <summary>
         /// 처형 가능 범위.
-        /// Override 값이 0 이면 DataSO 기본값 사용.
+        /// _executionRangeOverride 가 0 이면 dataDefault 사용.
         /// </summary>
         public float ExecutionRange(float dataDefault)
             => _executionRangeOverride > 0f ? _executionRangeOverride : dataDefault;
@@ -151,7 +192,6 @@ namespace KEY
 
         private void Awake()
         {
-            // LockComponent 자동 탐색
             if (_lockComponent == null)
                 _lockComponent = GetComponentInChildren<LockComponent>();
 
@@ -161,7 +201,6 @@ namespace KEY
 
         private void Start()
         {
-            // LockComponent 이벤트 구독
             if (_lockComponent != null)
                 _lockComponent.OnLockUnlocked += HandleLockUnlocked;
         }
@@ -178,7 +217,15 @@ namespace KEY
 
         /// <summary>
         /// Phase 전환 시 초기화. BossKnight.InitializePhase() 에서 호출.
-        /// 자물쇠 초기화 + 활성/비활성 설정 + 속도 배율 리셋.
+        ///
+        /// [v1.2 수정]
+        ///   활성 부위 → 봉인 상태로 시작 → ApplySpeedMultiplier 호출
+        ///   비활성 부위 → ResetSpeedMultiplier 호출 (영향 없음)
+        ///
+        /// [Phase 시작 시 봉인 상태가 맞는 이유]
+        ///   기획: Phase 전환 시 자물쇠 전부 초기화 (봉인 상태로 복귀)
+        ///   → 활성 부위는 봉인(Locked) 상태로 시작해야 함
+        ///   → 봉인 상태 = 패턴 느림이므로 SpeedMultiplier 적용
         /// </summary>
         public void Initialize(BossPhase phase)
         {
@@ -186,18 +233,23 @@ namespace KEY
             _isActiveInCurrentPhase = _activePhases.Contains(phase);
             _isUnlocked = false;
 
-            // 자물쇠 초기화
+            // 자물쇠 초기화 (봉인 상태로 리셋)
             _lockComponent?.ResetLock();
 
             // 자물쇠 콜라이더 활성/비활성
             if (_lockCollider != null)
                 _lockCollider.enabled = _isActiveInCurrentPhase;
 
-            // 패턴 속도 배율 리셋
-            ResetSpeedMultiplier();
+            // ★ v1.2 수정: 활성 부위 = 봉인 상태 시작 → 패턴 느림 적용
+            //              비활성 부위 = 영향 없음 → 1.0 복귀
+            if (_isActiveInCurrentPhase)
+                ApplySpeedMultiplier(_sealedSpeedMultiplier);
+            else
+                ResetSpeedMultiplier();
 
             Debug.Log($"[BossPartComponent] {_partType} 초기화 — " +
-                      $"Phase:{phase} 활성:{_isActiveInCurrentPhase}");
+                      $"Phase:{phase} 활성:{_isActiveInCurrentPhase} " +
+                      $"배율:{(_isActiveInCurrentPhase ? _sealedSpeedMultiplier : 1.0f)}");
         }
 
         /// <summary>
@@ -212,8 +264,11 @@ namespace KEY
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// LockComponent.OnLockUnlocked 이벤트 수신 시 호출.
-        /// 약점 노출 + 패턴 속도 배율 적용.
+        /// LockComponent.OnLockUnlocked 이벤트 수신.
+        ///
+        /// [v1.2 수정]
+        ///   해제 = 패턴 빠름 → ResetSpeedMultiplier() (1.0 복귀)
+        ///   기획: 자물쇠 해제할수록 패턴 위험도 증가
         /// </summary>
         private void HandleLockUnlocked()
         {
@@ -221,18 +276,20 @@ namespace KEY
 
             _isUnlocked = true;
 
-            // 팔 봉인 효과 — 패턴 속도 느려짐
-            ApplySpeedMultiplier(_sealedSpeedMultiplier);
+            // ★ v1.2 수정: 해제 → 패턴 1.0 복귀 (빨라짐 = 위험 증가)
+            ResetSpeedMultiplier();
 
             OnPartUnlocked?.Invoke(_partType);
 
-            Debug.Log($"[BossPartComponent] {_partType} 자물쇠 해제 → " +
-                      $"패턴 속도 배율: {_sealedSpeedMultiplier}");
+            Debug.Log($"[BossPartComponent] {_partType} 자물쇠 해제 → 패턴 속도 1.0 복귀 (위험 증가)");
         }
 
         /// <summary>
-        /// 재잠금 — A키 홀드 처형으로 자물쇠를 다시 잠금.
-        /// BossExecutionHandler 에서 호출.
+        /// 재잠금. A키 홀드 처형 완료 시 BossExecutionHandler 에서 호출.
+        ///
+        /// [v1.2 수정]
+        ///   재잠금 = 패턴 느림 복귀 → ApplySpeedMultiplier(_sealedSpeedMultiplier)
+        ///   기획: 재봉인 시 패턴 속도/시전 시간 원래대로 복귀
         /// </summary>
         public void ReLock()
         {
@@ -241,35 +298,42 @@ namespace KEY
             _isUnlocked = false;
             _lockComponent?.ResetLock();
 
-            // 패턴 속도 배율 복귀
-            ResetSpeedMultiplier();
+            // ★ v1.2 수정: 재잠금 → 패턴 느림 복귀
+            ApplySpeedMultiplier(_sealedSpeedMultiplier);
 
             OnPartReLocked?.Invoke(_partType);
 
-            Debug.Log($"[BossPartComponent] {_partType} 재잠금 완료");
+            Debug.Log($"[BossPartComponent] {_partType} 재잠금 → 패턴 속도 {_sealedSpeedMultiplier} 복귀");
         }
 
         /// <summary>
-        /// 직접 해제 — A키 홀드 처형으로 자물쇠를 직접 해제.
-        /// BossExecutionHandler 에서 호출.
+        /// 직접 해제. A키 홀드 처형(잠긴 부위) 시 BossExecutionHandler 에서 호출.
+        /// HandleLockUnlocked 가 OnLockUnlocked 이벤트로 자동 호출됨.
         /// </summary>
         public void ForceUnlock()
         {
             if (_isUnlocked) return;
             _lockComponent?.ForceUnlock();
-            // HandleLockUnlocked 가 OnLockUnlocked 이벤트로 자동 호출됨
         }
 
         // ══════════════════════════════════════════════════════
         // 패턴 속도 배율
         // ══════════════════════════════════════════════════════
 
+        /// <summary>
+        /// 연결된 패턴에 속도 배율 적용.
+        /// 봉인(Locked) 상태 시 호출.
+        /// </summary>
         private void ApplySpeedMultiplier(float multiplier)
         {
             foreach (var pattern in _affectedPatterns)
                 pattern?.SetSpeedMultiplier(multiplier);
         }
 
+        /// <summary>
+        /// 연결된 패턴 속도 배율을 1.0 으로 리셋.
+        /// 해제(Unlocked) 상태 시 호출.
+        /// </summary>
         private void ResetSpeedMultiplier()
         {
             foreach (var pattern in _affectedPatterns)
@@ -283,14 +347,17 @@ namespace KEY
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = _isUnlocked
-                ? new Color(1f, 0.8f, 0f, 0.5f)
-                : new Color(0.3f, 0.3f, 1f, 0.5f);
+                ? new Color(1f, 0.8f, 0f, 0.5f)   // 노란색 = 해제
+                : new Color(0.3f, 0.3f, 1f, 0.5f); // 파란색 = 봉인
+
             Gizmos.DrawWireSphere(transform.position, 0.4f);
 
 #if UNITY_EDITOR
+            UnityEditor.Handles.color = Color.white;
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * 0.6f,
-                $"{_partType} {(_isUnlocked ? "[해제]" : "[잠금]")} " +
+                $"{_partType} " +
+                $"{(_isUnlocked ? "[해제] 속도:1.0" : $"[봉인] 속도:{_sealedSpeedMultiplier}")} " +
                 $"{(_isActiveInCurrentPhase ? "" : "[비활성]")}");
 #endif
         }
