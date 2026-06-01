@@ -358,6 +358,7 @@ GameObject:
   - component: {fileID: 1428830662360480358}
   - component: {fileID: 5724810485760124141}
   - component: {fileID: 7889989144940949961}
+  - component: {fileID: 2124522648961175125}
   m_Layer: 15
   m_Name: TestBoss
   m_TagString: Untagged
@@ -636,6 +637,24 @@ MonoBehaviour:
   _cameraShakeStrength: 0.3
   _cameraShakeDuration: 0.3
   _shockwaveEffect: {fileID: 0}
+--- !u!114 &2124522648961175125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 367935668262967058}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2faa7f3e5959024c8189a6731b66d08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KEY.ObjectFlipController
+  _flipSourceType: 3
+  _flipTargets:
+  - {fileID: 13215985704595696}
+  - {fileID: 1814246414852122713}
+  _invertList: 0001
+  _spriteRenderers: []
 --- !u!1 &1990324531168466286
 GameObject:
   m_ObjectHideFlags: 0
