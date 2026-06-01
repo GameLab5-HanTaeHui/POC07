@@ -516,6 +516,7 @@ namespace KEY
             foreach (var part in _allParts)
             {
                 if (part == null) continue;
+                if (part.PartType == BossPartType.Core) continue;
                 if (!part.IsCurrentPhaseActive(_currentPhase)) continue;
                 if (!part.IsUnlocked) return false;
             }
