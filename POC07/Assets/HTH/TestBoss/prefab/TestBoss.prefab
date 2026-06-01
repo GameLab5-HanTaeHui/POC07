@@ -602,7 +602,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2968433269355708732}
   - component: {fileID: 6662513423083704301}
-  m_Layer: 15
+  m_Layer: 16
   m_Name: PunchShot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -653,6 +653,9 @@ MonoBehaviour:
   _windupRotate: -90
   _windupRotateDuration: 0.4
   _shotOvershoot: 90
+  _playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
   _retreatSpeed: 5
   _retreatDuration: 0.4
   _warningColor: {r: 0.3, g: 0.6, b: 1, a: 1}
@@ -992,7 +995,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1407729656419398009}
   - component: {fileID: 9187158776398648181}
-  m_Layer: 15
+  m_Layer: 16
   m_Name: PunchDown
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1038,6 +1041,9 @@ MonoBehaviour:
   _slamDepth: 2.5
   _slamDuration: 0.2
   _hitboxDuration: 0.2
+  _playerLayer:
+    serializedVersion: 2
+    m_Bits: 1024
   _punchDamage: 15
   _windupRotate: -45
   _windupRotateDuration: 0.5
