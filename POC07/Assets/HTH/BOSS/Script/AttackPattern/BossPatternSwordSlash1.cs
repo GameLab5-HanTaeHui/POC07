@@ -16,7 +16,7 @@ using UnityEngine;
 
 namespace KEY
 {
-    public class BossPattern_Slash1 : BossPatternBase
+    public class BossPattern_SwordSlash1 : BossPatternBase
     {
         [Header("── 검 제식 1 설정 ──────────────────────")]
         [Tooltip("돌진 속도.")][Min(1f)][SerializeField] private float _chargeSpeed = 20f;

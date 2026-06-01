@@ -2719,7 +2719,6 @@ GameObject:
   - component: {fileID: 9155757700093978229}
   - component: {fileID: 4786762246786967241}
   - component: {fileID: 7978836000794051389}
-  - component: {fileID: 133633099351766724}
   m_Layer: 15
   m_Name: Core
   m_TagString: Untagged
@@ -2861,28 +2860,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KEY.BossPartComponent
   _partType: 8
-  _activePhases: 000000000100000002000000
+  _activePhases: 0100000002000000
   _lockComponent: {fileID: 6748220436585209531}
   _lockCollider: {fileID: 4840739885641569293}
   _affectedPatterns: []
   _sealedSpeedMultiplier: 1.5
   _executionRangeOverride: 0
---- !u!114 &133633099351766724
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6525522089746316751}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8da1229fc5d43584299f9ee3d187a10c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KEY.BossCoreLock
-  _coreObject: {fileID: 6525522089746316751}
-  _coreLockComponent: {fileID: 6748220436585209531}
-  _coreCollider: {fileID: 4786762246786967241}
-  _activateEffect: {fileID: 0}
 --- !u!1 &6599010614339815743
 GameObject:
   m_ObjectHideFlags: 0
@@ -4860,7 +4843,9 @@ MonoBehaviour:
   _interceptHands:
   - {fileID: 7470561095168860163}
   - {fileID: 5161909713976177775}
-  _interceptHandSeals: []
+  _interceptHandSeals:
+  - {fileID: 5038355210814872210}
+  - {fileID: 2019900418286469324}
   _interceptSealDuration: 4
   _parryEffect: {fileID: 0}
   _rearDetectThreshold: -0.2
@@ -4938,7 +4923,7 @@ MonoBehaviour:
   - {fileID: 6084001728870912130}
   - {fileID: 6747303381522502940}
   - {fileID: 5884361878668601980}
-  _invertList: 
+  _invertList: 000000
   _spriteRenderers: []
 --- !u!114 &1593083509663395581
 MonoBehaviour:
@@ -5073,7 +5058,7 @@ MonoBehaviour:
   _recoveryDuration: 0.5
   _canInterruptDuringWarning: 0
   _canInterruptDuringActive: 0
-  _isSwordPattern: 0
+  _isSwordPattern: 1
   _rangeIndicator: {fileID: 3767945170681390240}
   _slashDamage: 20
   _slashRadius: 5
@@ -5095,7 +5080,7 @@ MonoBehaviour:
   _recoveryDuration: 0.5
   _canInterruptDuringWarning: 0
   _canInterruptDuringActive: 0
-  _isSwordPattern: 0
+  _isSwordPattern: 1
   _rangeIndicator: {fileID: 3767945170681390240}
   _shortSlashDamage: 12
   _shortSlashRadius: 3
@@ -5119,7 +5104,7 @@ MonoBehaviour:
   _recoveryDuration: 0.5
   _canInterruptDuringWarning: 0
   _canInterruptDuringActive: 0
-  _isSwordPattern: 0
+  _isSwordPattern: 1
   _rangeIndicator: {fileID: 2285697246844970759}
   _outerRadius: 6
   _innerRadius: 2
@@ -5142,7 +5127,7 @@ MonoBehaviour:
   _recoveryDuration: 0.5
   _canInterruptDuringWarning: 0
   _canInterruptDuringActive: 0
-  _isSwordPattern: 0
+  _isSwordPattern: 1
   _rangeIndicator: {fileID: 2285697246844970759}
   _startRadius: 3
   _radiusStep: 2
@@ -5167,7 +5152,7 @@ MonoBehaviour:
   _recoveryDuration: 0.5
   _canInterruptDuringWarning: 0
   _canInterruptDuringActive: 0
-  _isSwordPattern: 0
+  _isSwordPattern: 1
   _rangeIndicator: {fileID: 2025361181042803849}
   _chargeSpeed: 20
   _chargeMaxDistance: 25

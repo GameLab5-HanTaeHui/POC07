@@ -21,7 +21,7 @@ using UnityEngine;
 
 namespace KEY
 {
-    public class BossPattern_Slash4 : BossPatternBase
+    public class BossPattern_SwordSlash4 : BossPatternBase
     {
         [Header("── 검 제식 4 설정 ──────────────────────")]
         [Tooltip("도넛 외부 반경.")][Min(0f)][SerializeField] private float _outerRadius = 6f;
