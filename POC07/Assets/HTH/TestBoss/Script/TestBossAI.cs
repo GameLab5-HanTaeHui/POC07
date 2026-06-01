@@ -140,7 +140,7 @@ namespace KEY
 
         /// <summary>
         /// 패턴 목록.
-        /// Inspector 에서 TestBossPattern_Charge, TestBossPattern_Stomp 연결.
+        /// Inspector 에서 TestBossPattern_PunchDown, TestBossPattern_PunchShot 연결.
         /// </summary>
         [Tooltip("패턴 목록. Inspector 에서 연결.")]
         [SerializeField] private List<TestBossPatternBase> _patterns = new();

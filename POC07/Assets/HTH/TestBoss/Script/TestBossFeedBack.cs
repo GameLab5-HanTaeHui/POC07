@@ -64,8 +64,8 @@
 //   TestBossCore, TestBossAI 는 자동 탐색.
 //   _bodyRenderer    : 루트 SpriteRenderer (자동 탐색 가능)
 //   _coreRenderer    : Core 자식 SpriteRenderer (선택)
-//   _chargePattern   : TestBossPattern_Charge (선택, Charge 전용 연출)
-//   _stompPattern    : TestBossPattern_Stomp  (선택, Stomp 전용 연출)
+//   _punchShotPattern   : TestBossPattern_PunchShot (선택, 수평 발사 전용 연출)
+//   _punchDownPattern    : TestBossPattern_PunchDown (선택, 내리찍기 전용 연출)
 //
 // [DOTween 사용 버전]
 //   DOTween (Free) — DOTween.Init() 불필요 (AutoPlay 기본값)
@@ -75,6 +75,7 @@
 //   namespace : KEY
 // ============================================================
 
+using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 
@@ -119,15 +120,15 @@ namespace KEY
         /// 돌진 패턴 컴포넌트.
         /// Warning 타입 구분에 사용.
         /// </summary>
-        [Tooltip("TestBossPattern_Charge. 연결 시 Charge Warning 전용 연출.")]
-        [SerializeField] private TestBossPattern_Charge _chargePattern;
+        [Tooltip("TestBossPattern_PunchShot. 연결 시 PunchShot Warning 전용 연출.")]
+        [SerializeField] private TestBossPattern_PunchShot _punchShotPattern;
 
         /// <summary>
         /// 광역 패턴 컴포넌트.
         /// Warning 타입 구분에 사용.
         /// </summary>
-        [Tooltip("TestBossPattern_Stomp. 연결 시 Stomp Warning 전용 연출.")]
-        [SerializeField] private TestBossPattern_Stomp _stompPattern;
+        [Tooltip("TestBossPattern_PunchDown. 연결 시 PunchDown Warning 전용 연출.")]
+        [SerializeField] private TestBossPattern_PunchDown _punchDownPattern;
 
         // ──────────────────────────────────────────
         // Inspector — 연출 수치 (DOTween)
@@ -368,9 +369,9 @@ namespace KEY
             KillAllTweens();
             RestoreDefault();
 
-            bool isCharge = (pattern is TestBossPattern_Charge);
+            bool isPunchShot = (pattern is TestBossPattern_PunchShot);
 
-            if (isCharge)
+            if (isPunchShot)
                 PlayWarningCharge();
             else
                 PlayWarningStomp();
@@ -434,9 +435,9 @@ namespace KEY
         {
             KillAllTweens();
 
-            bool isCharge = (pattern is TestBossPattern_Charge);
+            bool isPunchShot = (pattern is TestBossPattern_PunchShot);
 
-            if (isCharge)
+            if (isPunchShot)
                 PlayActiveCharge();
             else
                 PlayActiveStomp();
