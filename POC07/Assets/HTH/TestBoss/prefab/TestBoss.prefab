@@ -652,8 +652,7 @@ MonoBehaviour:
   _flipSourceType: 3
   _flipTargets:
   - {fileID: 13215985704595696}
-  - {fileID: 1814246414852122713}
-  _invertList: 0001
+  _invertList: 
   _spriteRenderers: []
 --- !u!1 &1990324531168466286
 GameObject:
@@ -713,9 +712,9 @@ MonoBehaviour:
   _shotDuration: 0.2
   _hitboxDuration: 0.18
   _punchDamage: 12
-  _windupRotate: -90
+  _windupRotate: 90
   _windupRotateDuration: 0.4
-  _shotOvershoot: 90
+  _shotOvershoot: -90
   _retreatSpeed: 5
   _retreatDuration: 0.4
   _activeColor: {r: 1, g: 1, b: 1, a: 1}
@@ -1144,9 +1143,9 @@ MonoBehaviour:
   _slamDuration: 0.2
   _hitboxDuration: 0.2
   _punchDamage: 15
-  _windupRotate: -45
+  _windupRotate: 45
   _windupRotateDuration: 0.5
-  _slamOvershoot: 80
+  _slamOvershoot: -80
   _warningColor: {r: 1, g: 0.55, b: 0.1, a: 1}
 --- !u!1 &8486521968893826863
 GameObject:

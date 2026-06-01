@@ -1,21 +1,20 @@
 ﻿// ============================================================
-// TestBossPattern_PunchShot.cs  v1.2
+// TestBossPattern_PunchShot.cs  v1.3
 // 테스트 미니보스 — 주먹2: 수평 날리기 패턴
 //
-// [v1.2 변경 — OnActive() 히트박스 활성화 추가]
+// [v1.3 변경 — ObjectFlipController 반전 대응]
 //
-//   [기존 v1.1 문제]
-//     Awake()     : _hitbox.enabled = false (초기화)
-//     Interrupt() : _hitbox.enabled = false (중단 시 OFF)
-//     OnActive()  : _hitbox.enabled = true 코드 없음 ← 누락
+//   [문제]
+//     _armOriginLocalPos 를 Awake() 에서만 캐싱.
+//     ObjectFlipController 가 Arm_R.localPosition.x 를 반전하면
+//     pullbackX 계산이 반전 전 좌표 기준 → 팔이 반대 방향으로 후퇴.
+//     targetX 도 마찬가지.
 //
-//     결과: Interrupt() 호출 후 히트박스가 꺼진 채 유지
-//           이후 모든 패턴에서 피격 불가
-//
-//   [v1.2 수정]
-//     OnActive() 시작 시 → _hitbox.enabled = true
-//     OnActive() 종료 시 → _hitbox.enabled = false
-//     Interrupt()        → _hitbox.enabled = false (유지)
+//   [수정]
+//     SyncOrigin(float dir) 추가.
+//     _facingDirection 으로 _shotDirection 대체.
+//     Warning 시작 시 플레이어 방향 계산 대신 _facingDirection 사용.
+//     pullbackX / targetX 계산에 _facingDirection 적용.
 //
 // [네임스페이스]
 //   namespace : KEY
@@ -57,14 +56,14 @@ namespace KEY
         [Tooltip("피격 데미지.")]
         [Min(0f)]
         [SerializeField] private float _punchDamage = 12f;
-        [Tooltip("Warning 회전 각도 (도).")]
+        [Tooltip("Warning 뒤로 젖힘 회전각 (도). 절댓값. 방향은 자동 적용.")]
         [Range(-90f, 90f)]
-        [SerializeField] private float _windupRotate = -90f;
+        [SerializeField] private float _windupRotate = 90f;
         [Tooltip("Warning 회전 소요 시간 (초).")]
         [Range(0.05f, 1.5f)]
         [SerializeField] private float _windupRotateDuration = 0.4f;
-        [Tooltip("Active 발사 오버슈트 회전각 (도).")]
-        [Range(-180f, 180f)]
+        [Tooltip("Active 발사 오버슈트 회전각 (도). 절댓값.")]
+        [Range(-90f, 180f)]
         [SerializeField] private float _shotOvershoot = 90f;
         [Tooltip("후퇴 속도 (units/s).")]
         [Min(0f)]
@@ -78,8 +77,6 @@ namespace KEY
         [SerializeField] private Color _activeColor = Color.white;
 
         // ──────────────────────────────────────────
-        // 프로퍼티
-        // ──────────────────────────────────────────
         public bool IsArmAvailable
             => _armPart == null || _armPart.CanPatternExecute;
 
@@ -90,10 +87,16 @@ namespace KEY
         private Vector3 _armOriginLocalEuler;
         private Color _armDefaultColor;
         private Transform _playerTransform;
-        private float _shotDirection;
         private Tween _moveTween;
         private Tween _rotateTween;
         private Tween _colorTween;
+
+        /// <summary>
+        /// 현재 보스 바라보는 방향. +1 = 오른쪽, -1 = 왼쪽.
+        /// SyncOrigin() 에서 갱신.
+        /// Warning / Active 의 발사 방향 및 회전 부호 계산에 사용.
+        /// </summary>
+        private float _facingDirection = 1f;
 
         // ══════════════════════════════════════════════════════
         // Unity 라이프사이클
@@ -116,7 +119,6 @@ namespace KEY
             if (_armPart == null && _armTransform != null)
                 _armPart = _armTransform.GetComponent<TestBossArmPart>();
 
-            // ★ 시작 시 히트박스 비활성화
             if (_hitbox != null) _hitbox.enabled = false;
 
             if (_bossRigid2D == null)
@@ -130,9 +132,26 @@ namespace KEY
             SetSealableArm(_armPart);
         }
 
-        private void OnDestroy()
+        private void OnDestroy() => KillArmTweens();
+
+        // ══════════════════════════════════════════════════════
+        // ★ v1.3: 원점 동기화 API
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// ObjectFlipController 가 방향 반전 후 이 메서드를 호출.
+        /// 현재 팔의 localPosition / localEulerAngles 를 원점으로 재캐싱.
+        /// _facingDirection 갱신 → Warning/Active 의 발사 방향 자동 적용.
+        /// </summary>
+        public void SyncOrigin(float dir)
         {
-            KillArmTweens();
+            _facingDirection = dir;
+
+            if (_armTransform != null)
+            {
+                _armOriginLocalPos = _armTransform.localPosition;
+                _armOriginLocalEuler = _armTransform.localEulerAngles;
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -142,27 +161,26 @@ namespace KEY
         /// <summary>
         /// Warning 단계.
         /// 팔 후퇴 + 뒤로 젖힘 회전 + 파란색.
+        /// _facingDirection 기준 발사 방향/회전 결정.
         /// </summary>
         protected override IEnumerator OnWarning()
         {
             if (_armTransform == null) yield break;
-
-            _shotDirection = (_playerTransform != null
-                && _playerTransform.position.x > transform.position.x)
-                ? 1f : -1f;
 
             _colorTween?.Kill();
             _colorTween = _armRenderer?
                 .DOColor(new Color(0.4f, 0.6f, 1f, 1f), _warningDuration * 0.4f)
                 .SetEase(Ease.InSine);
 
-            float pullbackX = _armOriginLocalPos.x - _windupPullback * _shotDirection;
+            // ★ v1.3: _facingDirection 기준 pullback (반전 시 반대 방향으로 후퇴)
+            float pullbackX = _armOriginLocalPos.x - _windupPullback * _facingDirection;
             _moveTween?.Kill();
             _moveTween = _armTransform
                 .DOLocalMoveX(pullbackX, _warningDuration * 0.7f)
                 .SetEase(Ease.OutCubic);
 
-            float targetZ = _armOriginLocalEuler.z + _windupRotate * _shotDirection;
+            // ★ v1.3: _facingDirection 으로 회전 방향 결정
+            float targetZ = _armOriginLocalEuler.z + _windupRotate * _facingDirection;
             _rotateTween?.Kill();
             _rotateTween = _armTransform
                 .DOLocalRotate(
@@ -176,16 +194,11 @@ namespace KEY
         /// <summary>
         /// Active 단계.
         /// 팔 수평 발사 + 앞으로 회전 오버슈트.
-        ///
-        /// [v1.2 수정]
-        ///   OnActive() 시작 시 _hitbox.enabled = true
-        ///   OnActive() 종료 시 _hitbox.enabled = false
         /// </summary>
         protected override IEnumerator OnActive()
         {
             if (_armTransform == null || _isInterrupted) yield break;
 
-            // ★ v1.2: 히트박스 활성화
             if (_hitbox != null) _hitbox.enabled = true;
 
             _colorTween?.Kill();
@@ -193,13 +206,15 @@ namespace KEY
                 .DOColor(_activeColor, 0.05f)
                 .SetEase(Ease.OutFlash);
 
-            float targetX = _armOriginLocalPos.x + _shotDistance * _shotDirection;
+            // ★ v1.3: _facingDirection 기준 발사 방향
+            float targetX = _armOriginLocalPos.x + _shotDistance * _facingDirection;
             _moveTween?.Kill();
             _moveTween = _armTransform
                 .DOLocalMoveX(targetX, _shotDuration)
                 .SetEase(Ease.OutExpo);
 
-            float shotZ = _armOriginLocalEuler.z + _shotOvershoot * _shotDirection;
+            // ★ v1.3: _facingDirection 으로 오버슈트 회전 방향 결정
+            float shotZ = _armOriginLocalEuler.z - _shotOvershoot * _facingDirection;
             _rotateTween?.Kill();
             _rotateTween = _armTransform
                 .DOLocalRotate(
@@ -218,16 +233,9 @@ namespace KEY
                 yield return null;
             }
 
-            // ★ v1.2: 히트박스 비활성화
             if (_hitbox != null) _hitbox.enabled = false;
-
-            Debug.Log("[TestBossPattern_PunchShot] Active — 수평 발사 종료 (HitBox OFF)");
         }
 
-        /// <summary>
-        /// Recovery 단계.
-        /// 팔 원위치 + 회전 복귀 + 봉인 색상 복구.
-        /// </summary>
         protected override IEnumerator OnRecovery()
         {
             if (_armTransform == null) yield break;
@@ -260,20 +268,11 @@ namespace KEY
             _armPart?.RestoreArmColor();
         }
 
-        // ══════════════════════════════════════════════════════
-        // Interrupt 오버라이드
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// 강제 중단.
-        /// 히트박스 즉시 OFF + 팔 원위치 복귀 + 보스 후퇴.
-        /// </summary>
         public override void Interrupt()
         {
             base.Interrupt();
             KillArmTweens();
 
-            // ★ 중단 시 즉시 히트박스 OFF
             if (_hitbox != null) _hitbox.enabled = false;
 
             if (_armTransform != null)
@@ -288,22 +287,16 @@ namespace KEY
                     .OnComplete(() => _armPart?.RestoreArmColor());
             }
 
-            _colorTween = _armRenderer?
-                .DOColor(_armDefaultColor, 0.2f);
+            _colorTween = _armRenderer?.DOColor(_armDefaultColor, 0.2f);
 
             if (_bossRigid2D != null && _retreatSpeed > 0f)
                 StartCoroutine(RetreatRoutine());
-
-            Debug.Log("[TestBossPattern_PunchShot] 중단 → 팔 원위치 + HitBox OFF + 보스 후퇴");
         }
-
-        // ══════════════════════════════════════════════════════
-        // 유틸리티
-        // ══════════════════════════════════════════════════════
 
         private IEnumerator RetreatRoutine()
         {
-            float retreatDir = -_shotDirection;
+            // 후퇴는 발사 반대 방향
+            float retreatDir = -_facingDirection;
             float elapsed = 0f;
             while (elapsed < _retreatDuration)
             {
@@ -314,7 +307,6 @@ namespace KEY
                 elapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }
-
             if (_bossRigid2D != null)
                 _bossRigid2D.linearVelocity = new Vector2(0f, _bossRigid2D.linearVelocity.y);
         }

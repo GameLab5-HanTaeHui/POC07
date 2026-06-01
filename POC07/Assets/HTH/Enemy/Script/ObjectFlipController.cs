@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// ObjectFlipController.cs  v1.3
+// ObjectFlipController.cs  v1.4
 // 자식 오브젝트 좌우 반전 일괄 관리 컴포넌트
 //
 // [v1.3 변경 — TestBossAI 소스 추가]
@@ -198,6 +198,7 @@ namespace KEY
         /// ① _flipTargets 전체 localPosition.x 일괄 반전.
         /// ② PlayerWeaponMover 원점 동기화 (Player 전용).
         /// ③ _spriteRenderers 전체 flipX 반전.
+        /// ④ TestBossPattern SyncOrigin 호출 (v1.4 추가)
         /// </summary>
         private void HandleFlipped(float dir)
         {
@@ -225,6 +226,18 @@ namespace KEY
             {
                 if (_spriteRenderers[i] != null)
                     _spriteRenderers[i].flipX = flipped;
+            }
+
+            // ④ TestBossPattern SyncOrigin — 반전 후 팔 원점 재캐싱
+            //    패턴이 반전된 좌표를 원위치로 인식하게 함
+            if (_flipSourceType == FlipSourceType.TestBossAI)
+            {
+                var patterns = GetComponentsInChildren<TestBossPatternBase>(true);
+                foreach (var p in patterns)
+                {
+                    if (p is TestBossPattern_PunchDown pd) pd.SyncOrigin(dir);
+                    else if (p is TestBossPattern_PunchShot ps) ps.SyncOrigin(dir);
+                }
             }
         }
 
