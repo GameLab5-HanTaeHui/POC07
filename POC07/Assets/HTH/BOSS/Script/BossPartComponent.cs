@@ -282,12 +282,22 @@ namespace KEY
             if (_lockCollider != null)
                 _lockCollider.enabled = _isActiveInCurrentPhase;
 
-            // ★ v1.2 수정: 활성 부위 = 봉인 상태 시작 → 패턴 느림 적용
-            //              비활성 부위 = 영향 없음 → 1.0 복귀
-            if (_isActiveInCurrentPhase)
-                ApplySpeedMultiplier(_sealedSpeedMultiplier);
+            // 팔 타입(ArmL, ArmR)은 해제 상태로 시작
+            // → 플레이어가 처형으로 봉인해야 코어 활성
+            // 그 외 부위(방패, 검 등)는 잠금 상태로 시작
+            if (_partType == BossPartType.ArmL || _partType == BossPartType.ArmR)
+            {
+                _isUnlocked = true;        // 해제 상태로 강제 설정
+                ResetSpeedMultiplier();    // 해제 = 패턴 빠름
+            }
             else
-                ResetSpeedMultiplier();
+            {
+                _isUnlocked = false;       // 잠금 상태
+                if (_isActiveInCurrentPhase)
+                    ApplySpeedMultiplier(_sealedSpeedMultiplier);
+                else
+                    ResetSpeedMultiplier();
+            }
 
             // 색상 피드백 — 활성 부위만 적용
             if (_isActiveInCurrentPhase)
