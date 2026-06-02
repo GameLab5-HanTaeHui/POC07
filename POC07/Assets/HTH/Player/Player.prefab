@@ -742,6 +742,9 @@ MonoBehaviour:
   _hitFlashInterval: 0.08
   _knockbackForce: 6
   _knockbackDecay: 0.8
+  _knockbackUpward: 0.3
+  _hitStopDuration: 0.07
+  _hitStopTimeScale: 0.02
 --- !u!114 &1003960632617719240
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// ObjectFlipController.cs  v1.4
+// ObjectFlipController.cs  v1.5
 // 자식 오브젝트 좌우 반전 일괄 관리 컴포넌트
 //
 // [v1.3 변경 — TestBossAI 소스 추가]
@@ -91,6 +91,8 @@ namespace KEY
 
         [Header("── SpriteRenderer flipX 반전 대상 ──────────────────────")]
 
+        [Tooltip("flipX 반전 대상 반대로 적용 시키기.")]
+        [SerializeField] private bool _spriteFlipX;
         [Tooltip("flipX 반전 대상 SpriteRenderer 목록. 방향 전환 시 flipX = (dir < 0) 적용.")]
         [SerializeField] private List<SpriteRenderer> _spriteRenderers = new List<SpriteRenderer>();
 
@@ -134,13 +136,24 @@ namespace KEY
         // 초기화
         // ══════════════════════════════════════════════════════
 
+        /// <summary>
+        /// 각 Target 의 localPosition.x 를 부호 포함 실제 값으로 캐싱.
+        ///
+        /// [v1.5 수정]
+        ///   기존: Mathf.Abs 로 절댓값만 저장
+        ///     Arm_L(-2), Arm_R(+2) 모두 2 로 캐싱됨
+        ///     반전 시 2 * dir * 1 → 둘 다 -2 로 겹침
+        ///   수정: 부호 포함 그대로 저장
+        ///     Arm_L = -2, Arm_R = +2
+        ///     반전 시 originalX * -1 → Arm_L: +2, Arm_R: -2 (정확한 대칭)
+        /// </summary>
         private void CacheOriginalPositions()
         {
             _originalAbsX = new float[_flipTargets.Count];
             for (int i = 0; i < _flipTargets.Count; i++)
             {
                 if (_flipTargets[i] != null)
-                    _originalAbsX[i] = Mathf.Abs(_flipTargets[i].localPosition.x);
+                    _originalAbsX[i] = _flipTargets[i].localPosition.x; // ★ v1.5 Mathf.Abs 제거
             }
         }
 
@@ -211,6 +224,10 @@ namespace KEY
                 float sign = invert ? -1f : 1f;
                 Vector3 pos = _flipTargets[i].localPosition;
 
+                // ★ v1.5: originalX 는 부호 포함 실제 값
+                //   dir=+1(오른쪽): originalX 그대로 사용 (초기 상태 복원)
+                //   dir=-1(왼쪽):  originalX * -1 로 대칭 이동
+                //   invert=true:   부호 추가 반전 (후방 자물쇠 등)
                 _flipTargets[i].localPosition = new Vector3(
                     _originalAbsX[i] * dir * sign,
                     pos.y,
@@ -221,7 +238,10 @@ namespace KEY
             _weaponMover?.SyncOrigin(dir);
 
             // ③ SpriteRenderer flipX 반전
-            bool flipped = dir < 0f;
+            bool flipped;
+            if (_spriteFlipX) flipped = dir > 0f;
+            else flipped = dir < 0f;
+
             for (int i = 0; i < _spriteRenderers.Count; i++)
             {
                 if (_spriteRenderers[i] != null)
@@ -250,7 +270,7 @@ namespace KEY
         {
             if (target == null) return;
             Array.Resize(ref _originalAbsX, _originalAbsX.Length + 1);
-            _originalAbsX[_originalAbsX.Length - 1] = Mathf.Abs(target.localPosition.x);
+            _originalAbsX[_originalAbsX.Length - 1] = target.localPosition.x; // v1.5 Mathf.Abs 제거
             _flipTargets.Add(target);
             _invertList.Add(invert);
         }

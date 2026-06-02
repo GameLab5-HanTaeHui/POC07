@@ -99,7 +99,7 @@ namespace KEY
         private void Update()
         {
             if (_testBossCore == null) return;
-
+#if UNITY_EDITOR
             // 그로기 강제 진입
             if (Keyboard.current[_triggerKey].wasPressedThisFrame)
             {
@@ -111,6 +111,7 @@ namespace KEY
             {
                 TriggerDilTimeNow();
             }
+#endif
         }
 
         // ══════════════════════════════════════════════════════
@@ -160,6 +161,6 @@ namespace KEY
         {
             _testBossCore?.ResetBoss();
         }
-    }
 #endif
+    }
 }
